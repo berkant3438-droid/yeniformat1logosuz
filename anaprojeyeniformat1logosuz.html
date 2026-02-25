@@ -1,0 +1,3174 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>İCÜ Ticaret Yarışıyor - V69</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- PeerJS for Online Connectivity -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: radial-gradient(circle, #1e3a8a 0%, #0f172a 100%);
+            color: white;
+            overflow-x: hidden;
+            user-select: none;
+            transition: background 0.5s;
+            touch-action: manipulation;
+        }
+
+        .game-font { font-family: 'Montserrat', sans-serif; font-weight: 900; }
+
+        /* --- SCREEN TRANSITIONS --- */
+        .screen-section {
+            display: none;
+            min-height: 100vh;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        /* CSS FIX: !important eklenerek ID çakışması önlendi */
+        .screen-active {
+            display: flex !important;
+            animation: zoomInFade 0.6s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+        }
+        @keyframes zoomInFade {
+            from { opacity: 0; transform: scale(0.95) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        /* --- READY OVERLAY --- */
+        #ready-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #1e40af 0%, #020617 100%);
+            z-index: 50; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 1s ease-in-out, visibility 1s;
+        }
+        .ready-text {
+            font-size: 8rem; font-weight: 900; color: #fbbf24;
+            text-shadow: 0 0 50px rgba(251, 191, 36, 0.5);
+            letter-spacing: 10px;
+            animation: pulseReady 2s infinite;
+        }
+        .ready-sub {
+            font-size: 3rem; color: white; letter-spacing: 5px; margin-top: 1rem;
+            opacity: 0.8;
+        }
+        @keyframes pulseReady {
+            0% { transform: scale(1); text-shadow: 0 0 20px rgba(251, 191, 36, 0.5); }
+            50% { transform: scale(1.05); text-shadow: 0 0 60px rgba(251, 191, 36, 1); }
+            100% { transform: scale(1); text-shadow: 0 0 20px rgba(251, 191, 36, 0.5); }
+        }
+
+        /* --- WAITING SCREEN --- */
+        #screen-waiting {
+            background: black;
+            position: relative; 
+        }
+        .logo-waiting {
+            width: 300px; height: auto; border-radius: 50%;
+            box-shadow: 0 0 50px rgba(255, 255, 255, 0.2);
+            animation: breatheLogo 4s ease-in-out infinite;
+        }
+        @keyframes breatheLogo {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(37, 99, 235, 0.5)); }
+            50% { transform: scale(1.1); filter: drop-shadow(0 0 60px rgba(251, 191, 36, 0.8)); }
+        }
+
+        /* --- TUTORIAL / SIMULATION SCREEN --- */
+        #screen-tutorial {
+            background: radial-gradient(circle at center, #111827 0%, #000000 100%);
+        }
+        .sim-container {
+            width: 800px; height: 400px;
+            background: rgba(30, 41, 59, 0.8);
+            border: 4px solid #3b82f6;
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(59, 130, 246, 0.3);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .sim-mode {
+            width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.5s ease-in-out;
+            position: absolute; top: 0; left: 0;
+        }
+        .sim-active { opacity: 1; z-index: 10; }
+
+        .sim-dot { transition: all 0.3s; }
+        .sim-dot.active { background-color: #fbbf24; transform: scale(1.5); }
+
+        /* --- RULES & QR SCREEN --- */
+        #screen-rules {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+        }
+        .rule-item {
+            opacity: 0;
+            transform: translateX(-50px);
+            animation: slideInRule 0.5s ease-out forwards;
+        }
+        @keyframes slideInRule {
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .qr-big {
+            width: 300px; height: 300px;
+            background: white; padding: 10px; border-radius: 20px;
+            box-shadow: 0 0 50px rgba(251, 191, 36, 0.4);
+            animation: floatQR 3s ease-in-out infinite;
+        }
+        @keyframes floatQR {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* --- MULTIPLIER & TIMER BADGES --- */
+        #multiplier-badge {
+            display: none;
+            background: linear-gradient(45deg, #ef4444, #b91c1c);
+            color: white; padding: 0.5rem 1.5rem; border-radius: 1rem;
+            font-weight: 900; font-size: 1.5rem; letter-spacing: 2px;
+            border: 2px solid white; box-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+            margin-left: 1rem;
+            animation: pulseRed 2s infinite;
+        }
+
+        @keyframes timerPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); background-color: #7f1d1d; border-color: #ef4444; box-shadow: 0 0 30px #ef4444; }
+        }
+        .timer-warning { animation: timerPulse 0.5s infinite; }
+
+        /* --- TYPEWRITER CURSOR --- */
+        .cursor {
+            display: inline-block; width: 10px; height: 1em; background-color: #fbbf24;
+            animation: blink 1s infinite; vertical-align: bottom; margin-left: 5px;
+        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        /* --- NORMAL ROUND CARDS --- */
+        .answer-card { perspective: 1000px; cursor: pointer; opacity: 0; }
+        .card-enter-active { animation: cardEnter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+        @keyframes cardEnter { from { opacity: 0; transform: translateY(30px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        
+        .card-inner {
+            position: relative; width: 100%; height: 100%; text-align: center;
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-style: preserve-3d;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); border-radius: 0.5rem;
+        }
+        .card-inner.flipped { transform: rotateX(180deg); }
+
+        .card-front, .card-back {
+            position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden;
+            display: flex; align-items: center; justify-content: center;
+            border: 2px solid #fbbf24; border-radius: 0.5rem; overflow: hidden;
+        }
+        .card-front { background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%); color: white; z-index: 2; }
+        .card-front .number-badge {
+            background-color: #1e3a8a; border: 2px solid #fbbf24; width: 40px; height: 40px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: bold;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        }
+        .card-back {
+            background: linear-gradient(180deg, #fcd34d 0%, #fbbf24 100%); color: #1e3a8a; transform: rotateX(180deg);
+            display: flex; justify-content: space-between; padding: 0 20px; font-weight: bold; font-size: 1.5rem;
+            text-shadow: 0px 1px 0px rgba(255,255,255,0.4);
+        }
+
+        /* --- RISK MODE STYLES --- */
+        .risk-back-neutral { background: linear-gradient(180deg, #fcd34d 0%, #fbbf24 100%); }
+        .risk-back-good { background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%); color: white; text-shadow: none; }
+        .risk-back-bad { background: linear-gradient(180deg, #f87171 0%, #ef4444 100%); color: white; text-shadow: none; }
+        .risk-back-special { background: linear-gradient(180deg, #c084fc 0%, #a855f7 100%); color: white; text-shadow: none; }
+        
+        .hearts-container {
+            display: none; /* Hidden by default */
+            justify-content: center; gap: 0.5rem; margin-top: 0.5rem; font-size: 1.5rem;
+        }
+        .heart-icon { color: #ef4444; filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.8)); }
+        .heart-lost { color: #4b5563; filter: none; opacity: 0.5; }
+
+        /* --- CHAIN MODE (ROUND 3) STYLES --- */
+        .chain-container {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 100%; height: 100%;
+        }
+        .chain-card-container {
+            perspective: 2000px;
+            width: 80%;
+            max-width: 800px;
+            height: 350px;
+        }
+        .chain-card {
+            width: 100%; height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-radius: 20px;
+        }
+        .chain-card.flipped { transform: rotateY(180deg); }
+        
+        .chain-face {
+            position: absolute; width: 100%; height: 100%;
+            backface-visibility: hidden; -webkit-backface-visibility: hidden;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border-radius: 20px; padding: 2rem; text-align: center;
+            border: 4px solid #fbbf24;
+        }
+        
+        .chain-front {
+            background: linear-gradient(135deg, #1e3a8a, #172554);
+            color: white;
+        }
+        .chain-back {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #1e3a8a;
+            transform: rotateY(180deg);
+        }
+        
+        .chain-question-text { font-size: 2.5rem; font-weight: 900; line-height: 1.2; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .chain-answer-text { font-size: 3.5rem; font-weight: 900; }
+        .chain-points { font-size: 2rem; font-weight: bold; margin-top: 1rem; background: white; padding: 0.5rem 1.5rem; border-radius: 2rem; color: #d97706; }
+        
+        .chain-progress { font-size: 1.2rem; color: #93c5fd; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 2px; }
+
+        /* --- WORDLE MODE STYLES --- */
+        .wordle-container {
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+            margin-top: 1rem;
+        }
+        .wordle-row {
+            display: flex; gap: 8px;
+        }
+        .wordle-cell {
+            width: 60px; height: 60px;
+            border: 2px solid #3b82f6;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; font-weight: 900; text-transform: uppercase;
+            color: white; background: rgba(30, 58, 138, 0.5);
+            transition: all 0.3s;
+            border-radius: 0.5rem;
+        }
+        /* State Colors */
+        .w-correct { background-color: #22c55e !important; border-color: #22c55e !important; animation: flipIn 0.5s; } /* Yeşil */
+        .w-present { background-color: #eab308 !important; border-color: #eab308 !important; animation: flipIn 0.5s; } /* Sarı */
+        .w-absent { background-color: #4b5563 !important; border-color: #4b5563 !important; animation: flipIn 0.5s; }  /* Gri */
+        .w-filled { border-color: #fbbf24; background: rgba(30, 58, 138, 0.9); transform: scale(1.05); }
+
+        @keyframes flipIn {
+            0% { transform: rotateX(0); }
+            50% { transform: rotateX(90deg); }
+            100% { transform: rotateX(0); }
+        }
+
+        /* --- GRID DÜZENİ --- */
+        #board-grid:has(> :last-child:nth-child(odd)) > :last-child {
+            grid-column: 1 / -1; max-width: 60%; margin: 0 auto;
+        }
+        #board-grid { opacity: 0; transition: opacity 1s ease-in-out; }
+        .board-visible { opacity: 1 !important; }
+
+        /* --- TEAM CARDS & SPOTLIGHT --- */
+        .team-card {
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(5px);
+            border: 2px solid rgba(255, 255, 255, 0.2); 
+            transition: all 0.6s cubic-bezier(0.25, 0.8, 0.25, 1); 
+            position: relative;
+            cursor: pointer;
+        }
+        .team-spotlight-active {
+            transform: scale(1.15) translateY(-10px);
+            box-shadow: 0 0 60px rgba(251, 191, 36, 0.6), inset 0 0 20px rgba(251, 191, 36, 0.4);
+            background: linear-gradient(145deg, rgba(251, 191, 36, 0.2), rgba(0,0,0,0.4));
+            border-color: #fbbf24;
+            z-index: 30;
+            opacity: 1;
+        }
+        .team-spotlight-dimmed {
+            transform: scale(0.9); opacity: 0.3; filter: grayscale(80%) blur(1px);
+            z-index: 10; border-color: rgba(255,255,255,0.1);
+        }
+        .team-eliminated {
+            filter: grayscale(100%) brightness(0.5);
+            opacity: 0.6;
+            transform: scale(0.95);
+            border-color: #ef4444;
+        }
+        .score-bump { animation: bump 0.2s ease-out; }
+        @keyframes bump { 0% { transform: scale(1.15); } 50% { transform: scale(1.3); color: #fff; } 100% { transform: scale(1.15); } }
+
+        /* --- STRIKES & OVERLAYS --- */
+        #strike-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7); z-index: 9999; align-items: center; justify-content: center; pointer-events: none;
+            backdrop-filter: blur(2px);
+        }
+        
+        /* Kırmızı flaş efekti */
+        .overlay-flash {
+            animation: redFlash 0.5s ease-out forwards;
+        }
+        @keyframes redFlash {
+            0% { background: rgba(220, 38, 38, 0.6); }
+            100% { background: rgba(0, 0, 0, 0.7); }
+        }
+
+        .big-x {
+            font-family: 'Montserrat', sans-serif; font-weight: 900; 
+            color: #ef4444; 
+            font-size: 25rem;
+            line-height: 1;
+            /* 3D ve Gölge Efekti */
+            text-shadow: 
+                0 0 30px rgba(239, 68, 68, 0.8),
+                8px 8px 0px #7f1d1d, 
+                -2px -2px 0px rgba(255,255,255,0.8);
+            /* Animasyon */
+            animation: slamEffect 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        }
+        
+        @keyframes slamEffect {
+            0% { transform: scale(5); opacity: 0; }
+            50% { transform: scale(0.9); opacity: 1; }
+            65% { transform: scale(1.1); }
+            80% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+
+        /* Steal Mode Overlay */
+        #steal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(220, 38, 38, 0.2); z-index: 50; pointer-events: none;
+            border: 10px solid #ef4444; box-shadow: inset 0 0 100px #ef4444;
+            animation: pulseRed 1s infinite;
+        }
+        @keyframes pulseRed { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+        /* --- BUZZER OVERLAY --- */
+        #buzzer-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10000;
+            flex-direction: column; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.9);
+            animation: flashBg 0.5s infinite alternate;
+        }
+        @keyframes flashBg { from { background: rgba(0,0,0,0.9); } to { background: rgba(20, 20, 50, 0.95); } }
+        
+        .buzzer-box {
+            background: white; border: 8px solid #fbbf24; border-radius: 2rem; padding: 4rem;
+            text-align: center; box-shadow: 0 0 150px rgba(251, 191, 36, 1);
+            animation: zoomInFade 0.3s ease-out; transform: scale(1.2);
+        }
+
+        /* --- INFO POPUP --- */
+        #info-popup {
+            display: none; position: fixed; top: 20%; left: 50%; transform: translateX(-50%);
+            z-index: 9000; background: rgba(0,0,0,0.9); padding: 2rem 4rem; border-radius: 1rem;
+            border: 4px solid #3b82f6; text-align: center; box-shadow: 0 0 50px rgba(59, 130, 246, 0.8);
+            animation: slideDown 0.5s ease-out;
+        }
+        @keyframes slideDown { from { top: -100px; opacity: 0; } to { top: 20%; opacity: 1; } }
+
+        /* --- KEY BADGE STYLE FOR ADMIN MODAL --- */
+        .key-badge {
+            background: #374151; padding: 2px 8px; border-radius: 4px; font-weight: bold; border: 1px solid #6b7280; font-family: monospace; display: inline-block; min-width: 24px; text-align: center;
+        }
+
+        /* --- REMOTE CONTROLLER SCREEN (CONTESTANT) --- */
+        #screen-remote { background: #000; }
+        .remote-btn {
+            width: 50%; height: 100vh; display: flex; align-items: center; justify-content: center;
+            font-size: 3rem; font-weight: 900; color: white; cursor: pointer;
+            transition: all 0.3s ease; flex-direction: column; padding: 1rem; text-align: center;
+            overflow: hidden; word-break: break-word;
+        }
+        
+        .remote-btn-left span {
+            transform: rotate(90deg); /* 180 flip from -90 */
+            white-space: nowrap; display: block; width: 300px;
+        }
+        .remote-btn-right span {
+            transform: rotate(-90deg);
+            white-space: nowrap; display: block; width: 300px;
+        }
+
+        .remote-btn:active { opacity: 0.7; }
+        .remote-btn-left { background: #2563eb; float: left; border-right: 4px solid white; }
+        .remote-btn-right { background: #dc2626; float: right; border-left: 4px solid white; }
+        
+        /* Remote Buzzer Animation States */
+        .remote-buzzed-active {
+            animation: flashRemote 0.2s infinite alternate;
+            z-index: 20;
+            box-shadow: 0 0 50px white;
+        }
+        @keyframes flashRemote {
+            from { filter: brightness(1); }
+            to { filter: brightness(1.5); }
+        }
+        .remote-buzzed-passive {
+            filter: grayscale(100%) brightness(0.2);
+            opacity: 0.1;
+            pointer-events: none;
+        }
+
+        .remote-status {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-90deg);
+            background: black; padding: 1rem 2rem; border-radius: 2rem; border: 2px solid white;
+            text-align: center; z-index: 50; pointer-events: none;
+        }
+
+        /* --- ADMIN REMOTE SCREEN (REJİ PANELİ) --- */
+        #screen-admin-panel {
+            background: #111827;
+            padding: 5px;
+        }
+        
+        /* Tabs */
+        .admin-tabs { display: flex; gap: 5px; margin-bottom: 5px; }
+        .admin-tab-btn { flex: 1; padding: 8px; background: #374151; color: #9ca3af; font-weight: bold; border-radius: 6px; border: 1px solid #4b5563; font-size: 0.9rem; }
+        .admin-tab-btn.active { background: #2563eb; color: white; border-color: #1d4ed8; }
+
+        /* Dashboard Items */
+        .admin-info-box { background: #1f2937; border-radius: 6px; padding: 5px; margin-bottom: 5px; border: 1px solid #374151; transition: all 0.3s; }
+        
+        /* KOMPAKT SKOR KUTUSU */
+        .admin-score-box {
+            background: #1f2937; border-radius: 6px; padding: 5px; 
+            border: 1px solid #374151; transition: all 0.3s;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            min-height: 80px; 
+            flex: 1;
+        }
+        .admin-score-box.active-turn { border: 2px solid #22c55e; background: #064e3b; }
+        .admin-score-box.buzzed { animation: flashRed 0.5s infinite; border-color: #ef4444; }
+        
+        @keyframes flashRed { 0%, 100% { background: #1f2937; } 50% { background: #7f1d1d; } }
+
+        .admin-score-label { color: #9ca3af; font-size: 0.7rem; font-weight: bold; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .admin-score-value { color: white; font-weight: 900; font-size: 1.2rem; line-height: 1.2; }
+        .admin-strike-indicator { color: #ef4444; font-weight: 900; font-size: 1rem; margin-top: 2px; }
+        
+        .admin-info-label { color: #9ca3af; font-size: 0.65rem; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
+        
+        /* GRID DÜZENİ */
+        .admin-layout-grid { display: grid; grid-cols-2; gap: 5px; margin-bottom: 5px; }
+        .admin-col { display: flex; flex-direction: column; gap: 5px; }
+
+        /* Cheat Sheet */
+        .cheat-row { display: flex; justify-content: space-between; padding: 4px; border-bottom: 1px solid #374151; font-size: 0.8rem; }
+        .cheat-row:last-child { border-bottom: none; }
+        .cheat-answer { color: #e5e7eb; }
+        .cheat-points { display: none; }
+
+        /* Buttons */
+        .admin-btn {
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; border-radius: 8px; cursor: pointer;
+            transition: transform 0.1s; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            text-transform: uppercase; text-align: center;
+        }
+        .admin-btn:active { transform: scale(0.95); }
+        .admin-btn-num { height: 40px; font-size: 1.1rem; background: #3b82f6; color: white; border-bottom: 3px solid #1d4ed8; }
+        .admin-btn-red { background: #ef4444; color: white; border-bottom: 3px solid #b91c1c; }
+        .admin-btn-green { background: #22c55e; color: white; border-bottom: 3px solid #15803d; }
+        .admin-btn-orange { background: #f59e0b; color: #111827; border-bottom: 3px solid #b45309; }
+        .admin-btn-gray { background: #4b5563; color: white; border-bottom: 3px solid #1f2937; }
+        .admin-btn-cyan { background: #06b6d4; color: white; border-bottom: 3px solid #0891b2; }
+        .admin-btn-xs { font-size: 0.6rem; padding: 2px 4px; height: auto; border-radius: 4px; border-bottom-width: 2px; }
+        
+        /* Inputs */
+        .admin-input { width: 100%; background: #374151; color: white; padding: 8px; border-radius: 6px; border: 1px solid #4b5563; margin-bottom: 5px; font-size: 0.9rem; }
+        .admin-select { width: 100%; background: #374151; color: white; padding: 8px; border-radius: 6px; border: 1px solid #4b5563; margin-bottom: 5px; font-size: 0.9rem; }
+
+        /* --- PRESENTER SCREEN (SUNUCU) --- */
+        #screen-presenter-panel { background: #000; padding: 10px; overflow-y: auto; }
+        .presenter-card { background: #111; border: 1px solid #333; padding: 15px; margin-bottom: 10px; border-radius: 8px; }
+        .presenter-label { color: #888; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 5px; }
+        .presenter-value { color: #fff; font-size: 1.2rem; font-weight: bold; }
+        .presenter-answer-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #222; }
+        .presenter-answer-row.revealed { color: #22c55e; }
+        .presenter-answer-row.hidden-ans { color: #999; }
+        .presenter-team-box { padding: 10px; text-align: center; border: 2px solid #333; border-radius: 8px; }
+        .presenter-team-box.active { border-color: #22c55e; background: #064e3b; }
+        .presenter-team-box.buzzed { background: #7f1d1d; border-color: #ef4444; }
+
+        /* --- AUDIENCE SCREEN (SEYİRCİ) --- */
+        #screen-audience-play {
+            background: #0f172a;
+            padding: 20px;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            overflow-y: auto;
+            min-height: 100vh;
+        }
+
+        /* --- ADMIN STYLES (MODAL) --- */
+        .admin-question-item { background: #f3f4f6; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; border: 1px solid #e5e7eb; }
+        .admin-question-item.active { border-color: #2563eb; background: #eff6ff; border-width: 2px; }
+        
+        .logo-intro { width: 180px; height: auto; margin-bottom: 2rem; object-fit: contain; filter: drop-shadow(0 0 15px rgba(251, 191, 36, 0.6)); border-radius: 20px; animation: floatLogo 3s ease-in-out infinite; }
+        @keyframes floatLogo { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .logo-header { height: 60px; width: auto; margin-right: 1rem; object-fit: contain; filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3)); }
+        
+        select { color: #111827 !important; background-color: white !important; font-weight: bold; }
+        select option { color: #111827; background-color: white; }
+        select:focus, input:focus { box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.7); border-color: #fbbf24; outline: none; }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+    <!-- Steal Mode Indicator -->
+    <div id="steal-overlay">
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+            <h1 class="text-6xl font-black text-white drop-shadow-[0_5px_5px_rgba(0,0,0,1)] tracking-widest uppercase">PUAN ÇALMA<br>FIRSATI!</h1>
+        </div>
+    </div>
+
+    <!-- Info Popup -->
+    <div id="info-popup">
+        <h2 class="text-4xl font-bold text-white mb-2" id="info-popup-title">BİLGİ</h2>
+        <h3 class="text-2xl font-bold text-amber-400" id="info-popup-sub"></h3>
+    </div>
+
+    <!-- Buzzer Overlay -->
+    <div id="buzzer-overlay">
+        <div class="buzzer-box">
+            <h2 class="text-4xl font-bold text-gray-500 mb-4 tracking-widest">CEVAP HAKKI</h2>
+            <h1 id="buzzer-team-name" class="text-8xl font-black text-blue-900 mb-2 uppercase">TAKIM ADI</h1>
+        </div>
+    </div>
+
+    <!-- 1. GİRİŞ EKRANI -->
+    <div id="screen-intro" class="screen-section screen-active bg-blue-900">
+        <div class="text-center p-8 border-4 border-amber-400 rounded-2xl bg-blue-950 shadow-2xl max-w-4xl mx-4 flex flex-col items-center transform transition duration-500 hover:scale-[1.01]">
+            <h1 class="text-3xl md:text-5xl font-black game-font text-white mb-2 glow-text tracking-wider leading-tight">İSTANBUL TİCARET ÜNİVERSİTESİ</h1>
+            <h1 class="text-4xl md:text-6xl font-black game-font text-amber-400 mb-8 glow-text tracking-wider">TİCARET YARIŞIYOR</h1>
+            
+            <div class="flex flex-col gap-4 w-full max-w-md">
+                <button onclick="goToSetup()" class="bg-amber-500 hover:bg-amber-400 text-blue-900 font-bold text-2xl py-4 rounded-full shadow-lg transform transition hover:scale-105 active:scale-95"><i class="fas fa-play mr-2"></i> OYUNU BAŞLAT</button>
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="goToRemoteSetup()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xl py-4 rounded-full shadow-lg transform transition hover:scale-105 active:scale-95"><i class="fas fa-gamepad mr-2"></i> YARIŞMACI</button>
+                    <button onclick="goToAdminRemoteSetup()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold text-xl py-4 rounded-full shadow-lg transform transition hover:scale-105 active:scale-95"><i class="fas fa-user-tie mr-2"></i> REJİ PANELİ</button>
+                </div>
+                <!-- SEYİRCİ BUTONU -->
+                <button onclick="goToAudienceSetup()" class="bg-teal-500 hover:bg-teal-400 text-white font-bold text-xl py-3 rounded-full shadow-lg transform transition hover:scale-105 active:scale-95"><i class="fas fa-users mr-2"></i> SEYİRCİ (OYLA)</button>
+                
+                <button onclick="goToPresenterSetup()" class="bg-purple-700 hover:bg-purple-600 text-white font-bold text-xl py-3 rounded-full shadow-lg transform transition hover:scale-105 active:scale-95"><i class="fas fa-microphone-alt mr-2"></i> SUNUCU PANELİ</button>
+            </div>
+            
+            <div class="mt-4 flex gap-4 text-sm text-blue-300">
+                <button onclick="toggleAdmin()" class="hover:text-white underline"><i class="fas fa-cog"></i> Veri Yönetimi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. KURULUM EKRANI (HOST) -->
+    <div id="screen-setup" class="screen-section">
+        <div class="max-w-2xl w-full p-8 bg-blue-900/80 border border-blue-500 rounded-xl backdrop-blur-md shadow-[0_0_30px_rgba(37,99,235,0.3)]">
+            <h2 class="text-3xl font-bold text-center mb-6 text-white">YARIŞMA KURULUMU</h2>
+            
+            <!-- Connection Info -->
+            <div class="mb-6 p-4 bg-black/40 rounded border border-amber-400 text-center animate-pulse">
+                <p class="text-amber-400 font-bold text-lg mb-1">TABLET BAĞLANTISI İÇİN</p>
+                <p class="text-white">Tabletlerden "YARIŞMACI", "REJİ" veya "SEYİRCİ"yi açın:</p>
+                <div class="text-4xl font-black text-white mt-2 tracking-widest bg-blue-800 inline-block px-4 py-1 rounded" id="host-id-display">...</div>
+                <div id="host-connection-status" class="text-xs mt-2 text-gray-400">Bağlantı bekleniyor...</div>
+            </div>
+
+            <div class="mb-8 p-4 bg-blue-950/50 rounded-lg border border-blue-700">
+                <label class="block text-amber-400 font-bold mb-2 text-lg">OYNANACAK BÖLÜMÜ SEÇİN</label>
+                <select id="game-set-select" class="w-full p-4 border-4 border-blue-600 rounded-lg text-xl text-gray-900 bg-white font-black cursor-pointer hover:border-amber-400 transition focus:border-amber-400">
+                </select>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-amber-400 font-bold mb-2">1. TAKIM (SOL)</label>
+                    <select id="team-select-1" onchange="document.getElementById('setup-team-1').value = this.value" class="w-full mb-2 p-2 rounded text-gray-900 bg-white font-bold border-2 border-blue-400">
+                        <option value="">-- Listeden Seç --</option>
+                    </select>
+                    <input type="text" id="setup-team-1" placeholder="Veya isim yazın..." value="Girişimciler" class="w-full p-3 bg-blue-950 border-2 border-blue-600 rounded text-white text-lg focus:border-amber-400 outline-none">
+                </div>
+                <div>
+                    <label class="block text-amber-400 font-bold mb-2">2. TAKIM (SAĞ)</label>
+                    <select id="team-select-2" onchange="document.getElementById('setup-team-2').value = this.value" class="w-full mb-2 p-2 rounded text-gray-900 bg-white font-bold border-2 border-blue-400">
+                        <option value="">-- Listeden Seç --</option>
+                    </select>
+                    <input type="text" id="setup-team-2" placeholder="Veya isim yazın..." value="Yöneticiler" class="w-full p-3 bg-blue-950 border-2 border-blue-600 rounded text-white text-lg focus:border-amber-400 outline-none">
+                </div>
+            </div>
+
+            <button onclick="saveTeamsAndStart()" class="w-full mt-8 bg-green-600 hover:bg-green-500 text-white font-bold text-xl py-4 rounded-lg shadow-lg transform hover:scale-105 transition border-b-4 border-green-800 active:border-b-0 active:translate-y-1">YARIŞMAYI BAŞLAT</button>
+        </div>
+    </div>
+
+    <!-- 2.5 WELCOME SCREEN -->
+    <div id="screen-welcome" class="screen-section bg-blue-900 text-center relative overflow-hidden">
+        <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+        <div class="z-10 flex flex-col items-center">
+            <h1 class="text-4xl md:text-6xl font-black game-font text-white mb-4 glow-text tracking-wider leading-tight">İSTANBUL TİCARET ÜNİVERSİTESİ</h1>
+            <h1 class="text-5xl md:text-7xl font-black game-font text-amber-400 mb-12 glow-text tracking-wider">TİCARET YARIŞIYOR</h1>
+        </div>
+    </div>
+
+    <!-- 3. REMOTE SETUP (CONTESTANT) -->
+    <div id="screen-remote-setup" class="screen-section">
+        <div class="max-w-md w-full p-8 bg-gray-900 border-2 border-white rounded-xl text-center">
+            <h2 class="text-3xl font-bold mb-6 text-amber-400">YARIŞMACI KUMANDASI</h2>
+            <p class="mb-4 text-gray-300">Bilgisayar ekranındaki "OYUN ID"sini girin:</p>
+            <input type="text" id="remote-id-input" placeholder="Örn: ICU-1234" class="w-full p-4 bg-gray-800 border-2 border-gray-600 rounded text-white text-2xl text-center font-bold uppercase mb-6 focus:border-amber-400 outline-none">
+            <button onclick="connectToHost('contestant')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold text-xl py-4 rounded-lg shadow-lg">BAĞLAN</button>
+            <button onclick="location.reload()" class="mt-4 text-gray-500 underline text-sm">Geri Dön</button>
+        </div>
+    </div>
+
+    <!-- 3.5. ADMIN REMOTE SETUP -->
+    <div id="screen-admin-setup" class="screen-section">
+        <div class="max-w-md w-full p-8 bg-gray-900 border-2 border-white rounded-xl text-center">
+            <h2 class="text-3xl font-bold mb-6 text-green-400">REJİ PANELİ BAĞLANTISI</h2>
+            <p class="mb-4 text-gray-300">Yönetim için "OYUN ID"sini girin:</p>
+            <input type="text" id="admin-id-input" placeholder="Örn: ICU-1234" class="w-full p-4 bg-gray-800 border-2 border-gray-600 rounded text-white text-2xl text-center font-bold uppercase mb-6 focus:border-green-400 outline-none">
+            <button onclick="connectToHost('admin')" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold text-xl py-4 rounded-lg shadow-lg">BAĞLAN</button>
+            <button onclick="location.reload()" class="mt-4 text-gray-500 underline text-sm">Geri Dön</button>
+        </div>
+    </div>
+
+    <!-- 3.6 PRESENTER SETUP -->
+    <div id="screen-presenter-setup" class="screen-section">
+        <div class="max-w-md w-full p-8 bg-purple-900 border-2 border-white rounded-xl text-center">
+            <h2 class="text-3xl font-bold mb-6 text-white">SUNUCU PANELİ BAĞLANTISI</h2>
+            <p class="mb-4 text-purple-200">Sunucu ekranı için "OYUN ID"sini girin:</p>
+            <input type="text" id="presenter-id-input" placeholder="Örn: ICU-1234" class="w-full p-4 bg-purple-800 border-2 border-purple-400 rounded text-white text-2xl text-center font-bold uppercase mb-6 focus:border-white outline-none">
+            <button onclick="connectToHost('presenter')" class="w-full bg-white hover:bg-gray-200 text-purple-900 font-bold text-xl py-4 rounded-lg shadow-lg">BAĞLAN</button>
+            <button onclick="location.reload()" class="mt-4 text-purple-300 underline text-sm">Geri Dön</button>
+        </div>
+    </div>
+
+    <!-- 3.7 AUDIENCE SETUP -->
+    <div id="screen-audience-setup" class="screen-section">
+        <div class="max-w-md w-full p-8 bg-teal-900 border-2 border-white rounded-xl text-center">
+            <h2 class="text-3xl font-bold mb-6 text-white">SEYİRCİ OYLAMASI</h2>
+            <p class="mb-4 text-teal-200">Oyuna katılmak için "OYUN ID"sini girin:</p>
+            <input type="text" id="audience-id-input" placeholder="Örn: ICU-1234" class="w-full p-4 bg-teal-800 border-2 border-teal-400 rounded text-white text-2xl text-center font-bold uppercase mb-6 focus:border-white outline-none">
+            <button onclick="connectToHost('audience')" class="w-full bg-teal-500 hover:bg-teal-400 text-white font-bold text-xl py-4 rounded-lg shadow-lg">KATIL</button>
+            <button onclick="location.reload()" class="mt-4 text-teal-300 underline text-sm">Geri Dön</button>
+        </div>
+    </div>
+
+    <!-- 3.8 AUDIENCE PLAY SCREEN -->
+    <div id="screen-audience-play" class="screen-section">
+        <div class="w-full max-w-md text-center">
+            <h2 class="text-2xl font-bold text-teal-400 mb-6">CEVAPLARINI GÖNDER</h2>
+            
+            <div id="audience-form-container" class="w-full flex flex-col gap-4 mb-6">
+                <div class="text-white">Oylama henüz başlamadı...</div>
+            </div>
+
+            <div id="audience-status" class="mb-4 text-gray-400 text-sm">Bağlantı Kuruldu.</div>
+            
+            <button onclick="sendAudienceBatch()" id="audience-submit-btn" class="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold text-xl py-4 rounded-lg shadow-lg mb-4 opacity-50" disabled>TÜMÜNÜ GÖNDER</button>
+            
+            <p class="text-xs text-gray-500 mt-8">Cevaplarınız anonim olarak gönderilecektir.<br>Reji oylamayı açtığında kutucuklar belirecektir.</p>
+        </div>
+    </div>
+
+    <!-- 4. REMOTE CONTROLLER (CONTESTANT SCREEN) -->
+    <div id="screen-remote" class="screen-section !flex-row !p-0 overflow-hidden relative">
+        <div id="remote-btn-0" class="remote-btn remote-btn-left" ontouchstart="sendBuzz(0)" onmousedown="sendBuzz(0)">
+            <i class="fas fa-hand-pointer mb-4 text-4xl opacity-50" style="transform: rotate(90deg);"></i>
+            <span id="remote-team-0-name">TAKIM A</span>
+        </div>
+        <div id="remote-btn-1" class="remote-btn remote-btn-right" ontouchstart="sendBuzz(1)" onmousedown="sendBuzz(1)">
+            <i class="fas fa-hand-pointer mb-4 text-4xl opacity-50" style="transform: rotate(-90deg);"></i>
+            <span id="remote-team-1-name">TAKIM B</span>
+        </div>
+        <div class="remote-status">
+            <div class="text-xs text-gray-400 uppercase tracking-widest mb-1">DURUM</div>
+            <div id="remote-status-text" class="text-xl font-bold text-green-400">BAĞLI</div>
+        </div>
+    </div>
+
+    <!-- 4.5. ADMIN CONTROL PANEL (REJİ KONSOLU) -->
+    <div id="screen-admin-panel" class="screen-section !justify-start overflow-y-auto">
+        <div class="w-full max-w-lg mx-auto flex flex-col gap-2 pb-8">
+            <h2 class="text-center text-white font-bold text-lg py-1 border-b border-gray-700">REJİ PANELİ</h2>
+            
+            <!-- Tabs -->
+            <div class="admin-tabs">
+                <div class="admin-tab-btn active" id="tab-controls-btn" onclick="switchAdminTab('controls')">KONTROL</div>
+                <div class="admin-tab-btn" id="tab-setup-btn" onclick="switchAdminTab('setup')">KURULUM</div>
+            </div>
+
+            <!-- CONTROLS TAB -->
+            <div id="tab-controls-content">
+                <!-- Takım Skorları -->
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <!-- Team A -->
+                    <div class="admin-score-box" id="admin-box-0">
+                        <div class="admin-score-label truncate w-full text-center" id="admin-team-0-name">TAKIM A</div>
+                        <div class="admin-score-value" id="admin-score-0">0</div>
+                        <div class="admin-strike-indicator" id="admin-strikes-0"></div>
+                        <button onclick="sendAdminCmd('SET_TURN_0')" class="admin-btn admin-btn-xs admin-btn-gray mt-1 w-full" style="font-size: 0.6rem; height: 20px; line-height: 1;">SIRA VER</button>
+                        <div id="admin-buzz-0" class="hidden text-red-500 font-bold text-[10px] mt-0 animate-pulse">BASTI!</div>
+                    </div>
+                    <!-- Team B -->
+                    <div class="admin-score-box" id="admin-box-1">
+                        <div class="admin-score-label truncate w-full text-center" id="admin-team-1-name">TAKIM B</div>
+                        <div class="admin-score-value" id="admin-score-1">0</div>
+                        <div class="admin-strike-indicator" id="admin-strikes-1"></div>
+                        <button onclick="sendAdminCmd('SET_TURN_1')" class="admin-btn admin-btn-xs admin-btn-gray mt-1 w-full" style="font-size: 0.6rem; height: 20px; line-height: 1;">SIRA VER</button>
+                        <div id="admin-buzz-1" class="hidden text-red-500 font-bold text-[10px] mt-0 animate-pulse">BASTI!</div>
+                    </div>
+                </div>
+
+                <!-- Wordle Control Panel -->
+                <div id="admin-wordle-panel" class="admin-info-box border-yellow-600 bg-yellow-900/20" style="display: none;">
+                    <div class="admin-info-label text-yellow-400">WORDLE KELİME GİRİŞİ</div>
+                    <div class="flex gap-2">
+                        <input type="text" id="admin-wordle-input" class="admin-input uppercase font-bold text-center" maxlength="5" placeholder="KELİME (5 HARF)">
+                        <button onclick="submitAdminWordle()" class="admin-btn admin-btn-orange text-xs w-24">GÖNDER</button>
+                    </div>
+                </div>
+
+                <!-- Live Voting Control -->
+                <div class="admin-info-box border-teal-800 bg-teal-900/30">
+                    <div class="admin-info-label text-teal-400">CANLI SEYİRCİ OYLAMASI (TOPLU)</div>
+                    <div class="flex justify-between items-center mb-1">
+                        <div class="text-xs text-gray-300" id="admin-vote-count">Gelen: 0</div>
+                        <div class="text-xs font-bold text-white" id="admin-vote-status">DURUM: KAPALI</div>
+                    </div>
+                    
+                    <!-- NEW: Round Selectors for Voting -->
+                    <div class="mb-2 p-1 bg-black/20 rounded flex flex-wrap gap-1 justify-center">
+                        <label class="text-[10px] text-gray-400 w-full text-center">Seyirciye Gönderilecek Sorular:</label>
+                        <div class="flex gap-2">
+                             <label class="flex items-center gap-1 text-xs"><input type="checkbox" id="vote-round-1" checked> 1</label>
+                             <label class="flex items-center gap-1 text-xs"><input type="checkbox" id="vote-round-2" checked> 2</label>
+                             <label class="flex items-center gap-1 text-xs"><input type="checkbox" id="vote-round-3"> 3</label>
+                             <label class="flex items-center gap-1 text-xs"><input type="checkbox" id="vote-round-4"> 4</label>
+                             <label class="flex items-center gap-1 text-xs"><input type="checkbox" id="vote-round-5"> 5</label>
+                             <label class="flex items-center gap-1 text-xs"><input type="checkbox" id="vote-round-6"> 6</label>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                         <button onclick="sendAdminCmd('START_VOTE')" class="admin-btn admin-btn-cyan text-xs h-8">OYLAMAYI AÇ</button>
+                         <button onclick="sendAdminCmd('CALCULATE_CURRENT')" class="admin-btn admin-btn-orange text-xs h-8" style="background: #ea580c; border-bottom-color: #9a3412;">AKTİF TURU HESAPLA</button>
+                    </div>
+
+                    <!-- NEW: Manual Editor Container -->
+                    <div id="admin-vote-editor" class="hidden mt-2 border-t border-gray-600 pt-2">
+                         <div class="text-[10px] text-yellow-300 mb-1">AI ÖNERİSİ (DÜZENLE & YANSIT)</div>
+                         <textarea id="admin-vote-edit-area" class="w-full h-24 bg-black text-white text-xs p-1 font-mono rounded" placeholder="CEVAP1=40&#10;CEVAP2=30"></textarea>
+                         <button onclick="pushEditedVotes()" class="admin-btn admin-btn-green w-full mt-1 text-xs h-6">TAHTAYA YANSIT</button>
+                    </div>
+                </div>
+                
+                <!-- ZAMAN SAYACI KONTROL (YENİ) -->
+                <div class="admin-info-box border-red-800 bg-red-900/20 mt-2">
+                    <div class="admin-info-label text-red-400">ZAMAN SAYACI (SANİYE)</div>
+                    <div class="flex gap-2">
+                        <input type="number" id="admin-timer-input" class="admin-input text-center font-bold text-lg m-0" value="15" style="width: 80px;">
+                        <button onclick="sendAdminCmd('START_TIMER')" class="admin-btn admin-btn-red text-xs flex-1 border-red-900">BAŞLAT</button>
+                        <button onclick="sendAdminCmd('STOP_TIMER')" class="admin-btn admin-btn-gray text-xs flex-1">DURDUR</button>
+                    </div>
+                </div>
+
+                <div class="admin-info-box">
+                    <div class="admin-info-label">AKTİF SORU / MOD</div>
+                    <div class="text-xs text-gray-300 truncate" id="admin-current-question">Bekleniyor...</div>
+                </div>
+
+                <div class="admin-info-box">
+                    <div class="admin-info-label">CEVAPLAR (KOPYA)</div>
+                    <div id="admin-cheat-sheet" class="flex flex-col gap-0">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+
+                <!-- Cevaplar Grid -->
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                    <button onclick="sendAdminCmd('KEY_1')" class="admin-btn admin-btn-num">1</button>
+                    <button onclick="sendAdminCmd('KEY_2')" class="admin-btn admin-btn-num">2</button>
+                    <button onclick="sendAdminCmd('KEY_3')" class="admin-btn admin-btn-num">3</button>
+                    <button onclick="sendAdminCmd('KEY_4')" class="admin-btn admin-btn-num">4</button>
+                    <button onclick="sendAdminCmd('KEY_5')" class="admin-btn admin-btn-num">5</button>
+                    <button onclick="sendAdminCmd('KEY_6')" class="admin-btn admin-btn-num">6</button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                    <button onclick="sendAdminCmd('STRIKE')" class="admin-btn admin-btn-red text-2xl h-12">X</button>
+                    <button onclick="sendAdminCmd('ENTER')" class="admin-btn admin-btn-green text-sm h-12">ONAYLA</button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                      <button onclick="sendAdminCmd('PASS')" class="admin-btn admin-btn-orange h-10 text-xs">PAS (Z)</button>
+                      <button onclick="sendAdminCmd('REVEAL_ALL')" class="admin-btn admin-btn-cyan h-10 text-xs">TÜMÜNÜ AÇ (V)</button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                    <button onclick="sendAdminCmd('NEXT')" class="admin-btn admin-btn-gray h-8 text-xs">SONRAKİ TUR >></button>
+                    <button onclick="sendAdminCmd('FINISH')" class="admin-btn admin-btn-red text-xs h-8 border-red-900 bg-red-800">BİTİR</button>
+                </div>
+                
+                <div class="grid grid-cols-1 gap-2 mt-2">
+                    <button onclick="sendAdminCmd('MUSIC')" class="admin-btn admin-btn-gray text-xs h-8">MÜZİK</button>
+                </div>
+            </div>
+
+            <!-- SETUP TAB -->
+            <div id="tab-setup-content" style="display:none;">
+                <div class="admin-info-box">
+                    <div class="admin-info-label mb-2">BÖLÜM SEÇİMİ</div>
+                    <select id="admin-set-select" class="admin-select"></select>
+                </div>
+
+                <div class="admin-info-box">
+                    <div class="admin-info-label mb-2">TAKIM İSİMLERİ</div>
+                    <input type="text" id="admin-team-input-1" class="admin-input" placeholder="Takım A İsmi">
+                    <input type="text" id="admin-team-input-2" class="admin-input" placeholder="Takım B İsmi">
+                </div>
+
+                <button onclick="submitAdminSetup()" class="admin-btn admin-btn-green w-full h-12 text-sm mt-4">BAŞLAT / GÜNCELLE</button>
+            </div>
+            <div class="text-center text-gray-500 text-xs mt-4">İstanbul Ticaret Üniversitesi</div>
+        </div>
+    </div>
+
+    <!-- 4.6 PRESENTER SCREEN (SUNUCU EKRANI) -->
+    <div id="screen-presenter-panel" class="screen-section !justify-start">
+        <div class="w-full max-w-4xl mx-auto">
+            <h2 class="text-center text-purple-400 font-black text-2xl mb-4 border-b border-purple-800 pb-2">SUNUCU PANELİ</h2>
+            
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div id="presenter-team-0-box" class="presenter-team-box">
+                    <div class="text-sm text-gray-400">TAKIM A</div>
+                    <div class="text-xl font-bold text-white mb-1" id="presenter-team-0-name">--</div>
+                    <div class="text-4xl font-black text-amber-400" id="presenter-score-0">0</div>
+                    <div class="text-red-500 font-bold text-xl mt-1" id="presenter-strikes-0"></div>
+                </div>
+                <div id="presenter-team-1-box" class="presenter-team-box">
+                    <div class="text-sm text-gray-400">TAKIM B</div>
+                    <div class="text-xl font-bold text-white mb-1" id="presenter-team-1-name">--</div>
+                    <div class="text-4xl font-black text-amber-400" id="presenter-score-1">0</div>
+                    <div class="text-red-500 font-bold text-xl mt-1" id="presenter-strikes-1"></div>
+                </div>
+            </div>
+
+            <div class="presenter-card">
+                <div class="presenter-label">AKTİF SORU</div>
+                <div class="text-2xl font-bold text-white leading-tight" id="presenter-question-text">Bekleniyor...</div>
+            </div>
+
+            <div class="presenter-card">
+                <div class="presenter-label">CEVAP ANAHTARI</div>
+                <div id="presenter-answers-list">
+                    <!-- JS Fills here -->
+                </div>
+            </div>
+
+            <div class="presenter-card">
+                <div class="presenter-label">SON DURUM</div>
+                <div class="text-lg font-bold text-green-400" id="presenter-status-log">--</div>
+            </div>
+             <div class="text-center mt-4">
+                <button onclick="location.reload()" class="bg-gray-800 text-gray-500 px-4 py-2 rounded">Çıkış</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. OYUN EKRANI (HOST) -->
+    <div id="screen-game" class="screen-section !justify-start min-h-screen relative overflow-hidden">
+        
+        <!-- Audience Calculation Overlay (YENİ) -->
+        <div id="audience-calc-overlay" class="hidden absolute top-0 left-0 w-full h-full bg-blue-950/95 z-[60] flex-col items-center justify-center backdrop-blur-md">
+            <i class="fas fa-satellite-dish fa-spin text-8xl text-teal-400 mb-6 drop-shadow-[0_0_20px_rgba(45,212,191,0.8)]"></i>
+            <h2 class="text-5xl font-black text-white tracking-[10px] animate-pulse text-center">SEYİRCİ VERİLERİ<br><span class="text-teal-400">ANALİZ EDİLİYOR...</span></h2>
+            <div class="w-96 h-6 bg-gray-800 rounded-full mt-8 overflow-hidden border-2 border-teal-500">
+                <div id="audience-calc-bar" class="h-full bg-gradient-to-r from-teal-400 to-blue-500 w-0"></div>
+            </div>
+        </div>
+
+        <!-- READY OVERLAY -->
+        <div id="ready-overlay">
+            <h1 class="ready-text">HAZIR OLUN</h1>
+            <h2 class="ready-sub">ELLER BUTONLARDA!</h2>
+        </div>
+
+        <!-- Header -->
+        <header class="w-full p-4 flex justify-between items-center bg-blue-900 border-b-4 border-amber-400 shadow-lg z-10 sticky top-0">
+            <div class="flex items-center">
+                <div class="w-12 h-12 bg-amber-400 rounded-full flex items-center justify-center text-blue-900 font-bold text-2xl border-2 border-white mr-3 shadow-lg" id="header-round-num">1</div>
+                <div class="text-white font-bold text-lg hidden md:block" id="header-set-name">Bölüm 1</div>
+                <!-- MULTIPLIER BADGE -->
+                <div id="multiplier-badge">x2 PUAN</div>
+                <!-- Connection Status Icon -->
+                <div id="game-conn-icon" class="ml-4 text-gray-500 text-xl" title="Tablet Bağlantısı"><i class="fas fa-mobile-alt"></i></div>
+            </div>
+            <div class="flex items-center gap-4">
+                <!-- TIMER EKRANI -->
+                <div id="game-timer-container" class="hidden items-center justify-center bg-red-600 border-2 border-white rounded-full w-16 h-16 shadow-[0_0_15px_rgba(220,38,38,0.8)]">
+                    <span id="game-timer" class="text-3xl font-black text-white">15</span>
+                </div>
+
+                <div class="text-xl font-bold bg-blue-800 px-6 py-2 rounded-lg border border-blue-600 shadow-inner relative mr-32 md:mr-48">
+                    KASA: <span id="round-points" class="text-amber-400 text-3xl ml-2 inline-block">0</span>
+                </div>
+                <button onclick="toggleAdmin()" class="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded text-white"><i class="fas fa-cog"></i></button>
+            </div>
+        </header>
+
+        <!-- Main Area -->
+        <main class="flex-grow w-full flex flex-col items-center p-4 relative z-20">
+            <!-- Oyun İçeriği Wrapper -->
+            <div id="game-content-wrapper" class="w-full flex flex-col items-center">
+                <!-- Soru Kutusu (Normal Mod) -->
+                <div id="normal-question-box" class="w-full max-w-4xl mb-6 text-center transform transition duration-500">
+                    <h2 class="text-3xl font-bold text-white drop-shadow-md bg-blue-800/60 backdrop-blur p-6 rounded-xl border border-blue-500 min-h-[120px] flex items-center justify-center shadow-xl">
+                        <span id="question-text-container"></span><span class="cursor" id="typewriter-cursor"></span>
+                    </h2>
+                </div>
+
+                <!-- Board (Dynamically filled) -->
+                <div id="board-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl"></div>
+            </div>
+            
+            <!-- Strikes -->
+            <div class="mt-6 flex gap-4 h-16 justify-center" id="strike-display"></div>
+        </main>
+
+        <!-- Footer / Skorlar -->
+        <footer class="w-full bg-blue-950 border-t border-blue-800 p-4 shadow-[0_-5px_15px_rgba(0,0,0,0.3)] z-20 relative">
+            <div class="max-w-6xl mx-auto flex flex-col md:flex-row gap-6">
+                <div class="grid grid-cols-2 gap-6 w-full md:w-2/3">
+                    <!-- Takım 1 -->
+                    <div class="team-card p-4 rounded-xl relative group" id="team-card-0" onclick="manualSetTurn(0)">
+                        <div class="text-xl font-bold text-amber-100 text-center mb-1 truncate" id="display-team-0">Takım A</div>
+                        <div class="text-6xl font-black text-center text-amber-400" id="score-0">0</div>
+                        <div class="hearts-container" id="hearts-0">
+                            <i class="fas fa-heart heart-icon"></i>
+                            <i class="fas fa-heart heart-icon"></i>
+                        </div>
+                        <div id="steal-btn-0" class="hidden mt-2 w-full bg-red-600 text-white text-center font-bold py-1 rounded animate-pulse">ÇALMA HAKKI</div>
+                    </div>
+                    <!-- Takım 2 -->
+                    <div class="team-card p-4 rounded-xl relative group" id="team-card-1" onclick="manualSetTurn(1)">
+                        <div class="text-xl font-bold text-amber-100 text-center mb-1 truncate" id="display-team-1">Takım B</div>
+                        <div class="text-6xl font-black text-center text-amber-400" id="score-1">0</div>
+                        <div class="hearts-container" id="hearts-1">
+                            <i class="fas fa-heart heart-icon"></i>
+                            <i class="fas fa-heart heart-icon"></i>
+                        </div>
+                        <div id="steal-btn-1" class="hidden mt-2 w-full bg-red-600 text-white text-center font-bold py-1 rounded animate-pulse">ÇALMA HAKKI</div>
+                    </div>
+                </div>
+
+                <!-- Kontroller -->
+                <div class="flex flex-col gap-3 w-full md:w-1/3 justify-center">
+                    <button onclick="triggerStrike()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-4 rounded-lg shadow-lg text-2xl tracking-widest border-b-4 border-red-800 active:border-b-0 active:translate-y-1 transform hover:scale-105 transition">❌ HATALI (X)</button>
+                    <div class="flex gap-2">
+                        <button onclick="endGame()" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 rounded shadow border-b-4 border-gray-700 active:border-b-0 active:translate-y-1"><i class="fas fa-flag-checkered mr-2"></i> BİTİR</button>
+                        <button onclick="finishRound()" class="flex-[2] bg-amber-500 hover:bg-amber-400 text-blue-900 font-bold py-3 rounded shadow border-b-4 border-amber-600 active:border-b-0 active:translate-y-1 transform hover:scale-105 transition">SONRAKİ TUR <i class="fas fa-arrow-right ml-2"></i></button>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 6. OYUN SONU EKRANI -->
+    <div id="screen-gameover" class="screen-section bg-gradient-to-b from-blue-900 to-black text-center">
+        <!-- REMOVED "Oyun Bitti" text per request -->
+        <div class="p-12 bg-white/10 backdrop-blur-lg rounded-3xl border-4 border-amber-400 shadow-[0_0_100px_rgba(251,191,36,0.5)] max-w-4xl w-full mx-4 transform scale-110">
+            <div class="mb-4 text-amber-200 text-3xl font-bold tracking-[10px] uppercase">KAZANAN TAKIM</div>
+            <div class="text-8xl md:text-9xl font-black text-white mb-8 drop-shadow-[0_10px_10px_rgba(0,0,0,1)] animate-pulse" id="winner-name">TAKIM ADI</div>
+            <div class="text-6xl text-amber-400 font-bold game-font border-t border-white/30 pt-4 inline-block px-12" id="winner-score">0 PUAN</div>
+        </div>
+        <!-- REMOVED "Return to Waiting" button per request -->
+    </div>
+
+    <!-- 7. YENİ BEKLEME EKRANI (Waiting Mode) -->
+    <div id="screen-waiting" class="screen-section">
+        
+        <!-- Social Media Links -->
+        <div class="absolute bottom-10 flex flex-col items-center gap-3 text-blue-300/70 hover:opacity-100 transition duration-300">
+            <div class="flex items-center gap-2 text-xl font-bold"><i class="fab fa-instagram"></i> ticaretisletme</div>
+            <div class="flex items-center gap-2 text-xl font-bold"><i class="fab fa-tiktok"></i> @ticaretisletme</div>
+            <div class="flex items-center gap-2 text-lg font-bold text-center px-4"><i class="fab fa-linkedin"></i> İstanbul Ticaret Üniversitesi İşletme Topluluğu</div>
+        </div>
+    </div>
+    
+    <!-- 8. TUTORIAL / SIMULATION SCREEN -->
+    <div id="screen-tutorial" class="screen-section bg-gray-900 text-center">
+        <h1 class="text-4xl font-bold text-amber-400 mb-8 tracking-widest">OYUN MODLARI</h1>
+        
+        <div class="relative w-full max-w-4xl h-96 bg-gray-800 rounded-2xl border-4 border-blue-500 overflow-hidden shadow-2xl flex items-center justify-center p-8">
+            <!-- Simulation Containers -->
+            <div id="sim-normal" class="sim-mode hidden w-full">
+                <h2 class="text-2xl font-bold text-white mb-4">1. NORMAL MOD</h2>
+                <p class="text-blue-300 mb-6">En popüler cevapları bulun.</p>
+                <div class="flex justify-center gap-4">
+                    <div class="w-24 h-32 bg-blue-600 rounded-lg flex items-center justify-center border-2 border-white animate-bounce">1</div>
+                    <div class="w-24 h-32 bg-blue-600 rounded-lg flex items-center justify-center border-2 border-white animate-bounce" style="animation-delay: 0.2s">2</div>
+                    <div class="w-24 h-32 bg-blue-600 rounded-lg flex items-center justify-center border-2 border-white animate-bounce" style="animation-delay: 0.4s">3</div>
+                </div>
+            </div>
+
+            <div id="sim-chain" class="sim-mode hidden w-full">
+                <h2 class="text-2xl font-bold text-white mb-4">2. ZİNCİR MODU</h2>
+                <p class="text-yellow-400 mb-6">Soruları ardı ardına bilin, zinciri kırmayın.</p>
+                 <div class="w-64 h-40 bg-gradient-to-br from-blue-700 to-blue-900 rounded-xl border-4 border-yellow-400 flex items-center justify-center transform rotate-y-180 transition-all duration-1000">
+                    <span class="text-2xl font-bold">SORU -> CEVAP</span>
+                </div>
+            </div>
+
+            <div id="sim-wordle" class="sim-mode hidden w-full">
+                <h2 class="text-2xl font-bold text-white mb-4">3. WORDLE MODU</h2>
+                <p class="text-green-400 mb-6">5 Harfli Gizli Kelimeleri Bulun!</p>
+                <div class="flex flex-col gap-2">
+                    <div class="flex gap-2">
+                        <div class="w-12 h-12 bg-gray-600 border border-gray-400 flex items-center justify-center text-white font-bold text-xl">K</div>
+                        <div class="w-12 h-12 bg-gray-600 border border-gray-400 flex items-center justify-center text-white font-bold text-xl">A</div>
+                        <div class="w-12 h-12 bg-yellow-500 border border-yellow-400 flex items-center justify-center text-white font-bold text-xl">L</div>
+                        <div class="w-12 h-12 bg-gray-600 border border-gray-400 flex items-center justify-center text-white font-bold text-xl">E</div>
+                        <div class="w-12 h-12 bg-gray-600 border border-gray-400 flex items-center justify-center text-white font-bold text-xl">M</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <div class="w-12 h-12 bg-green-500 border border-green-400 flex items-center justify-center text-white font-bold text-xl">B</div>
+                        <div class="w-12 h-12 bg-green-500 border border-green-400 flex items-center justify-center text-white font-bold text-xl">A</div>
+                        <div class="w-12 h-12 bg-green-500 border border-green-400 flex items-center justify-center text-white font-bold text-xl">L</div>
+                        <div class="w-12 h-12 bg-green-500 border border-green-400 flex items-center justify-center text-white font-bold text-xl">I</div>
+                        <div class="w-12 h-12 bg-green-500 border border-green-400 flex items-center justify-center text-white font-bold text-xl">K</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sim-risk" class="sim-mode hidden w-full">
+                <h2 class="text-2xl font-bold text-white mb-4">4. RİSK MODU</h2>
+                <p class="text-red-400 mb-6">Kutuyu seçin: Hediye mi, Bomba mı?</p>
+                 <div class="flex justify-center gap-8">
+                    <div class="w-32 h-32 bg-gray-700 rounded-xl border-4 border-gray-500 flex items-center justify-center text-4xl">🎁</div>
+                    <div class="w-32 h-32 bg-gray-700 rounded-xl border-4 border-gray-500 flex items-center justify-center text-4xl">💣</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex gap-2 mt-4 justify-center">
+            <div id="sim-dot-0" class="w-3 h-3 rounded-full bg-gray-600 sim-dot active"></div>
+            <div id="sim-dot-1" class="w-3 h-3 rounded-full bg-gray-600 sim-dot"></div>
+            <div id="sim-dot-2" class="w-3 h-3 rounded-full bg-gray-600 sim-dot"></div>
+            <div id="sim-dot-3" class="w-3 h-3 rounded-full bg-gray-600 sim-dot"></div>
+        </div>
+
+        <button onclick="goToRulesScreen()" class="mt-8 bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded-full shadow-lg text-xl transition transform hover:scale-105">
+            İLERİ (ENTER) <i class="fas fa-arrow-right ml-2"></i>
+        </button>
+    </div>
+
+    <!-- 9. RULES & QR SCREEN (NEW) -->
+    <div id="screen-rules" class="screen-section">
+        <div class="w-full max-w-7xl grid grid-cols-2 gap-12 items-center px-12">
+            <!-- Rules Text -->
+            <div class="flex flex-col gap-6 text-left">
+                <h2 class="text-5xl font-black text-amber-400 mb-4 tracking-wider border-b-4 border-white pb-4 inline-block">OYUN KURALLARI</h2>
+                <div class="rule-item text-2xl font-bold text-white" style="animation-delay: 0.1s"><i class="fas fa-check-circle text-green-400 mr-3"></i> En çok cevabı bilen puanı alır.</div>
+                <div class="rule-item text-2xl font-bold text-white" style="animation-delay: 0.3s"><i class="fas fa-check-circle text-green-400 mr-3"></i> 3 yanlış yapan puanı kaptırır.</div>
+                <div class="rule-item text-2xl font-bold text-white" style="animation-delay: 0.5s"><i class="fas fa-check-circle text-green-400 mr-3"></i> Butona ilk basan cevap hakkı kazanır.</div>
+                <div class="rule-item text-2xl font-bold text-white" style="animation-delay: 0.7s"><i class="fas fa-check-circle text-green-400 mr-3"></i> Seyirciler QR kod ile <u>bazı oyunlara katılır.</u></div>
+            </div>
+
+            <!-- QR Code Area -->
+            <div class="flex flex-col items-center justify-center">
+                <div class="qr-big flex items-center justify-center mb-6">
+                    <img src="qrcode_berkant3438-droid.github.io.png" alt="Oylama QR" class="w-full h-full object-contain rounded-lg" onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://berkant3438-droid.github.io'">
+                </div>
+                <div class="text-4xl font-black text-white bg-blue-800 px-8 py-2 rounded-full border-4 border-amber-400 shadow-xl">
+                    OYLA
+                </div>
+                <div class="mt-2 text-blue-200 text-lg">berkant3438-droid.github.io</div>
+                <div id="rules-display-id" class="mt-4 text-3xl font-black text-yellow-400 tracking-widest bg-black/50 px-6 py-2 rounded border border-yellow-500">ICU-XXXX</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strike Overlay -->
+    <div id="strike-overlay"><div class="big-x">X</div></div>
+
+    <!-- Admin Modal (Veri Yönetimi) -->
+    <div id="admin-modal" class="fixed inset-0 hidden z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm text-gray-800">
+        <div class="bg-white w-full max-w-5xl rounded-lg shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-blue-900 cursor-pointer hover:underline" onclick="renderAdminData()" title="Veri Ekranına Dön"><i class="fas fa-edit mr-2"></i>Veri Yönetimi</h3>
+                <div class="flex gap-2">
+                    <button onclick="renderAdminShortcuts()" class="bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700 text-sm" title="Kısayollar"><i class="fas fa-keyboard"></i></button>
+                    <button onclick="resetDataToDefault()" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"> Sıfırla</button>
+                    <button onclick="document.getElementById('file-upload').click()" class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"><i class="fas fa-upload mr-1"></i> Yükle</button>
+                    <input type="file" id="file-upload" class="hidden" accept=".json" onchange="importData(this)">
+                    <button onclick="exportData()" class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"><i class="fas fa-download mr-1"></i> İndir</button>
+                    <button onclick="toggleAdmin()" class="text-red-500 hover:bg-red-50 px-3 py-1 rounded ml-2"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="p-6 overflow-y-auto flex-grow bg-gray-100" id="admin-body">
+                <p class="text-sm text-gray-500 mb-4">Şu anki düzenleme modu kısıtlıdır. En iyi yönetim için "İndir" butonuyla JSON dosyasını alıp, düzenleyip tekrar "Yükle" yapınız.</p>
+                <div id="questions-container" class="space-y-6"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- PEERJS CONFIGURATION & LOGIC ---
+        let hostPeer = null;
+        let remotePeer = null;
+        let conn = null;
+        let gameId = "";
+
+        function generateGameId() {
+            return 'ICU-' + Math.floor(1000 + Math.random() * 9000);
+        }
+
+        // Host Başlatma (Setup Ekranında)
+        function initHostPeer() {
+            gameId = generateGameId();
+            document.getElementById('host-id-display').innerText = gameId;
+            document.getElementById('rules-display-id').innerText = gameId; // Update Rules Screen ID
+            
+            hostPeer = new Peer(gameId); // PeerJS Cloud kullanır
+
+            hostPeer.on('open', (id) => {
+                console.log('Host ID:', id);
+            });
+
+            hostPeer.on('connection', (c) => {
+                c.on('data', (data) => {
+                    handleRemoteData(data);
+                });
+                c.on('open', () => {
+                    document.getElementById('host-connection-status').innerText = "CİHAZ BAĞLANDI!";
+                    document.getElementById('host-connection-status').classList.add('text-green-400');
+                    document.getElementById('game-conn-icon').classList.add('text-green-500');
+                    playTone(1000, 'sine', 0.2, 0.2); // Bağlantı sesi
+                    setTimeout(syncAdminState, 1000);
+                });
+            });
+            
+            hostPeer.on('error', (err) => {
+                console.error(err);
+                if(err.type === 'unavailable-id') { initHostPeer(); }
+            });
+        }
+
+        // Remote Başlatma
+        function goToRemoteSetup() { showScreen('screen-remote-setup'); }
+        function goToAdminRemoteSetup() { showScreen('screen-admin-setup'); }
+        function goToPresenterSetup() { showScreen('screen-presenter-setup'); }
+        function goToAudienceSetup() { showScreen('screen-audience-setup'); }
+
+        function connectToHost(mode) {
+            let inputId = "";
+            if (mode === 'contestant') inputId = document.getElementById('remote-id-input').value.trim().toUpperCase();
+            else if (mode === 'admin') inputId = document.getElementById('admin-id-input').value.trim().toUpperCase();
+            else if (mode === 'presenter') inputId = document.getElementById('presenter-id-input').value.trim().toUpperCase();
+            else if (mode === 'audience') inputId = document.getElementById('audience-id-input').value.trim().toUpperCase();
+
+            if(!inputId) return alert("Lütfen ID girin");
+
+            remotePeer = new Peer(); 
+            remotePeer.on('open', (id) => {
+                const conn = remotePeer.connect(inputId);
+                conn.on('open', () => {
+                    console.log("Bağlandı!");
+                    if (mode === 'contestant') showScreen('screen-remote');
+                    else if (mode === 'admin') showScreen('screen-admin-panel');
+                    else if (mode === 'presenter') showScreen('screen-presenter-panel');
+                    else if (mode === 'audience') showScreen('screen-audience-play');
+                });
+                
+                // Veri alma
+                conn.on('data', (data) => {
+                    if (mode === 'admin' && data.type === 'ADMIN_SYNC') {
+                        updateAdminUI(data);
+                    }
+                    if (mode === 'presenter' && data.type === 'ADMIN_SYNC') {
+                        updatePresenterUI(data);
+                    }
+                    if (mode === 'contestant' && data.type === 'STATE_UPDATE') {
+                        document.getElementById('remote-team-0-name').innerText = data.teamNames[0];
+                        document.getElementById('remote-team-1-name').innerText = data.teamNames[1];
+                        updateRemoteContestantUI(data.buzzedTeam);
+                    }
+                    if (mode === 'audience' && data.type === 'ADMIN_SYNC') {
+                        const container = document.getElementById('audience-form-container');
+                        const btn = document.getElementById('audience-submit-btn');
+                        
+                        // NEW LOGIC: Display Question Text + Input
+                        if(data.isVotingOpen && data.activeVotingData && data.activeVotingData.length > 0) {
+                             if(container.innerHTML.includes("Oylama henüz başlamadı") || container.children.length !== data.activeVotingData.length) {
+                                 container.innerHTML = "";
+                                 data.activeVotingData.forEach(item => {
+                                     const wrapper = document.createElement('div');
+                                     wrapper.className = "bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-md";
+                                     wrapper.innerHTML = `
+                                         <div class="text-teal-400 text-xs font-bold uppercase tracking-widest mb-1">${item.round}. SORU</div>
+                                         <div class="text-white text-lg font-bold mb-3 leading-tight">${item.text}</div>
+                                         <input type="text" data-round="${item.round}" placeholder="Cevabınız..." 
+                                             class="audience-batch-input w-full p-3 bg-gray-900 border border-teal-600 rounded text-white font-bold outline-none focus:border-white transition-colors">
+                                     `;
+                                     container.appendChild(wrapper);
+                                 });
+                             }
+                             btn.disabled = false;
+                             btn.classList.remove('opacity-50');
+                             document.getElementById('audience-status').innerText = "OYLAMA AÇIK! Soruları cevaplayıp gönderin.";
+                             document.getElementById('audience-status').className = "mb-4 text-green-400 font-bold animate-pulse";
+                        } else {
+                             container.innerHTML = "<div class='text-white p-6 bg-gray-800 rounded-xl border border-gray-600'>Reji oylamayı başlatınca sorular burada görünecek.</div>";
+                             btn.disabled = true;
+                             btn.classList.add('opacity-50');
+                             document.getElementById('audience-status').innerText = "OYLAMA KAPALI. Bekleyiniz.";
+                             document.getElementById('audience-status').className = "mb-4 text-red-400 font-bold";
+                        }
+                    }
+                });
+
+                conn.on('error', (err) => {
+                    alert("Bağlantı hatası! ID'yi kontrol edin.");
+                });
+            });
+        }
+        
+        function updateRemoteContestantUI(buzzedTeam) {
+            const btn0 = document.getElementById('remote-btn-0');
+            const btn1 = document.getElementById('remote-btn-1');
+            btn0.classList.remove('remote-buzzed-active', 'remote-buzzed-passive');
+            btn1.classList.remove('remote-buzzed-active', 'remote-buzzed-passive');
+            if (buzzedTeam === 0) {
+                btn0.classList.add('remote-buzzed-active');
+                btn1.classList.add('remote-buzzed-passive');
+            } else if (buzzedTeam === 1) {
+                btn1.classList.add('remote-buzzed-active');
+                btn0.classList.add('remote-buzzed-passive');
+            }
+        }
+
+        // Contestant Buzzer Function
+        function sendBuzz(teamIndex) {
+            if(!remotePeer) return;
+            Object.values(remotePeer.connections).forEach(conns => {
+                conns.forEach(c => c.send({ type: 'BUZZ', team: teamIndex }));
+            });
+            if(navigator.vibrate) navigator.vibrate(50);
+        }
+
+        // Audience Send Batch Answer
+        function sendAudienceBatch() {
+            const inputs = document.querySelectorAll('.audience-batch-input');
+            let answers = {};
+            let hasAnswer = false;
+            
+            inputs.forEach(inp => {
+                const val = inp.value.trim();
+                const round = inp.getAttribute('data-round');
+                if(val) {
+                    answers[round] = val;
+                    hasAnswer = true;
+                }
+            });
+
+            if(!hasAnswer) return alert("Lütfen en az bir cevap yazın.");
+            
+            if(!remotePeer) return;
+            Object.values(remotePeer.connections).forEach(conns => {
+                conns.forEach(c => c.send({ type: 'AUDIENCE_ANSWER_BATCH', answers: answers }));
+            });
+            
+            inputs.forEach(inp => inp.value = ""); // Clear inputs
+            const status = document.getElementById('audience-status');
+            status.innerText = "Cevaplar Gönderildi!";
+            status.classList.add('text-teal-400');
+            setTimeout(() => {
+                status.innerText = "Yeni cevap bekleniyor...";
+                status.classList.remove('text-teal-400');
+            }, 2000);
+        }
+
+        // --- TIMER YENİ MANTIĞI ---
+        let countdownInterval = null;
+        let currentTimerVal = 0;
+
+        function startTimer(seconds) {
+            clearInterval(countdownInterval);
+            currentTimerVal = seconds;
+            const container = document.getElementById('game-timer-container');
+            const timerSpan = document.getElementById('game-timer');
+            
+            container.classList.remove('hidden');
+            container.classList.add('flex');
+            container.classList.remove('timer-warning');
+            timerSpan.innerText = currentTimerVal;
+            playTone(600, 'sine', 0.2); 
+
+            countdownInterval = setInterval(() => {
+                currentTimerVal--;
+                timerSpan.innerText = currentTimerVal;
+
+                if (currentTimerVal <= 5 && currentTimerVal > 0) {
+                    playTone(800, 'square', 0.1); 
+                    container.classList.add('timer-warning');
+                }
+
+                if (currentTimerVal <= 0) {
+                    clearInterval(countdownInterval);
+                    playTone(150, 'sawtooth', 0.8); 
+                    container.classList.add('hidden');
+                    container.classList.remove('flex');
+                    triggerStrike(); 
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(countdownInterval);
+            const container = document.getElementById('game-timer-container');
+            if (container) {
+                container.classList.add('hidden');
+                container.classList.remove('flex');
+                container.classList.remove('timer-warning');
+            }
+        }
+
+        // Admin Command Function
+        function sendAdminCmd(action) {
+            if(!remotePeer) return;
+             if(navigator.vibrate) navigator.vibrate(20);
+            
+            let extraData = {};
+            if(action === 'START_VOTE') {
+                const rounds = [];
+                if(document.getElementById('vote-round-1') && document.getElementById('vote-round-1').checked) rounds.push(1);
+                if(document.getElementById('vote-round-2') && document.getElementById('vote-round-2').checked) rounds.push(2);
+                if(document.getElementById('vote-round-3') && document.getElementById('vote-round-3').checked) rounds.push(3);
+                if(document.getElementById('vote-round-4') && document.getElementById('vote-round-4').checked) rounds.push(4);
+                if(document.getElementById('vote-round-5') && document.getElementById('vote-round-5').checked) rounds.push(5);
+                if(document.getElementById('vote-round-6') && document.getElementById('vote-round-6').checked) rounds.push(6);
+                extraData.activeRounds = rounds;
+            }
+            if(action === 'START_TIMER') {
+                extraData.time = parseInt(document.getElementById('admin-timer-input').value) || 15;
+            }
+
+            Object.values(remotePeer.connections).forEach(conns => {
+                conns.forEach(c => c.send({ type: 'ADMIN_CMD', action: action, ...extraData }));
+            });
+        }
+
+        // Admin Push Edited Votes
+        function pushEditedVotes() {
+             const textArea = document.getElementById('admin-vote-edit-area');
+             const lines = textArea.value.trim().split('\n');
+             const finalAnswers = [];
+             lines.forEach(line => {
+                 const parts = line.split('=');
+                 if(parts.length === 2) {
+                     finalAnswers.push({ text: parts[0].trim().toUpperCase(), points: parseInt(parts[1].trim()) || 10 });
+                 }
+             });
+             if(!remotePeer) return;
+             Object.values(remotePeer.connections).forEach(conns => {
+                conns.forEach(c => c.send({ type: 'ADMIN_CMD', action: 'PUSH_VOTES', answers: finalAnswers }));
+             });
+        }
+        
+        // ADMIN WORDLE SUBMIT FUNCTION
+        function submitAdminWordle() {
+            const input = document.getElementById('admin-wordle-input');
+            const word = input.value.trim().toLocaleUpperCase('tr-TR');
+            if(!word) return;
+            if(!remotePeer) return;
+            Object.values(remotePeer.connections).forEach(conns => {
+                conns.forEach(c => c.send({ type: 'ADMIN_CMD', action: 'WORDLE_GUESS', word: word }));
+            });
+            input.value = ""; 
+        }
+        
+        // Admin Setup Submit
+        function submitAdminSetup() {
+            const setId = document.getElementById('admin-set-select').value;
+            const t1 = document.getElementById('admin-team-input-1').value;
+            const t2 = document.getElementById('admin-team-input-2').value;
+            if(!remotePeer) return;
+            Object.values(remotePeer.connections).forEach(conns => {
+                conns.forEach(c => c.send({ 
+                    type: 'ADMIN_SETUP', 
+                    setId: parseInt(setId),
+                    team1: t1,
+                    team2: t2
+                }));
+            });
+            alert("Komut gönderildi. Oyun başlatılıyor...");
+            switchAdminTab('controls');
+        }
+
+        // --- HOST VARIABLES FOR VOTING ---
+        let audienceVotes = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+        let isVotingOpen = false;
+        let activeRoundsForVoting = [];
+        let activeVotingData = []; 
+
+        // HOST SIDE: Data Handler
+        function handleRemoteData(data) {
+            // 1. BUZZER DATA
+            if(data.type === 'BUZZ') {
+                const gameScreen = document.getElementById('screen-game').classList.contains('screen-active');
+                if (gameScreen && !buzzerLocked && !isStealMode) {
+                    const readyOverlay = document.getElementById('ready-overlay');
+                    if(readyOverlay.style.visibility !== 'hidden' && readyOverlay.style.opacity !== '0') return;
+
+                    if (isChainMode) {
+                        return; // Buzzers disabled for Chain initially
+                    }
+                    if (isRiskMode && riskLives[data.team] <= 0) return;
+                    activateBuzzer(data.team);
+                }
+            } 
+            // 2. ADMIN COMMAND DATA
+            else if (data.type === 'ADMIN_CMD') {
+                switch(data.action) {
+                    case 'KEY_1': executeGameAction('1'); break;
+                    case 'KEY_2': executeGameAction('2'); break;
+                    case 'KEY_3': executeGameAction('3'); break;
+                    case 'KEY_4': executeGameAction('4'); break;
+                    case 'KEY_5': executeGameAction('5'); break;
+                    case 'KEY_6': executeGameAction('6'); break;
+                    case 'STRIKE': executeGameAction('X'); break;
+                    case 'PASS': executeGameAction('Z'); break;
+                    case 'ENTER': executeGameAction('ENTER'); break;
+                    case 'NEXT': finishRound(); break;
+                    case 'FINISH': endGame(); break;
+                    case 'REVEAL_ALL': executeGameAction('V'); break;
+                    case 'MUSIC': executeGameAction('M'); break;
+                    case 'SET_TURN_0': manualSetTurn(0); break;
+                    case 'SET_TURN_1': manualSetTurn(1); break;
+                    case 'START_VOTE': startAudienceVoting(data.activeRounds); break;
+                    case 'STOP_CALC_VOTE': stopVoting(); break; 
+                    case 'CALCULATE_CURRENT': calculateCurrentRoundVotes(); break;
+                    case 'PUSH_VOTES': applyEditedVotes(data.answers); break;
+                    case 'START_TIMER': startTimer(data.time); break;
+                    case 'STOP_TIMER': stopTimer(); break;
+                    case 'WORDLE_GUESS': 
+                        if (isWordleMode && data.word) {
+                            wordleCurrentInput = data.word;
+                            renderWordleBoard(); 
+                            setTimeout(submitWordleGuess, 500); 
+                        }
+                        break;
+                }
+            }
+            // 3. ADMIN SETUP DATA
+            else if (data.type === 'ADMIN_SETUP') {
+                document.getElementById('game-set-select').value = data.setId;
+                document.getElementById('setup-team-1').value = data.team1 || "Takım A";
+                document.getElementById('setup-team-2').value = data.team2 || "Takım B";
+                saveTeamsAndStart();
+            }
+            // 4. AUDIENCE ANSWER DATA (BATCH)
+            else if (data.type === 'AUDIENCE_ANSWER_BATCH') {
+                if(isVotingOpen && data.answers) {
+                    Object.keys(data.answers).forEach(roundKey => {
+                        if(audienceVotes[roundKey]) {
+                            audienceVotes[roundKey].push(data.answers[roundKey]);
+                        }
+                    });
+                    syncAdminState(); 
+                }
+            }
+        }
+        
+        // --- VOTING LOGIC (HOST) ---
+        function startAudienceVoting(rounds) {
+            isVotingOpen = true;
+            activeRoundsForVoting = rounds || [1,2,3,4,5,6];
+            
+            activeVotingData = activeRoundsForVoting.map(roundNum => {
+                const qData = currentQuestions[roundNum-1];
+                let qText = "Soru Bekleniyor...";
+                if(qData) {
+                    qText = qData.question;
+                }
+                return { round: roundNum, text: qText };
+            });
+
+            audienceVotes = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] }; // Reset
+            showInfoPopup("OYLAMA BAŞLADI", "Sorular Seyirci Ekranında");
+            syncAdminState();
+        }
+
+        function stopVoting() {
+            isVotingOpen = false;
+            showInfoPopup("OYLAMA KAPANDI", "Veri Alımı Durduruldu");
+            syncAdminState();
+        }
+
+        // --- ADVANCED LANGUAGE PROCESSING ALGORITHMS ---
+
+        // 1. Levenshtein Distance (Fuzzy Match)
+        function levenshtein(a, b) {
+            if (a.length === 0) return b.length;
+            if (b.length === 0) return a.length;
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+            for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) == a.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1,
+                            matrix[i][j - 1] + 1,
+                            matrix[i - 1][j] + 1
+                        );
+                    }
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        // 2. Simple Turkish Stemmer (Lemmatization Alternative)
+        function simpleTurkishStemmer(word) {
+            const suffixes = [
+                'CASINA', 'LARDAN', 'LERDEN', 'LARI', 'LERI', 'DAN', 'DEN', 'TAN', 'TEN',
+                'LAR', 'LER', 'NIN', 'NUN', 'NÜN', 'YIN', 'YUN', 'YÜN', 'LIK', 'LIK',
+                'CI', 'CI', 'CU', 'CÜ', 'LI', 'LI', 'LU', 'LÜ', 'SIZ', 'SIZ', 'SUZ', 'SÜZ',
+                'DA', 'DE', 'TA', 'TE', 'YA', 'YE', 'YI', 'YI', 'YU', 'YÜ',
+                'IM', 'IM', 'UM', 'ÜM', 'IN', 'IN', 'UN', 'ÜN',
+                'MEK', 'MAK', 'MA', 'ME'
+            ];
+            
+            let current = word;
+            for(let i=0; i<2; i++) { 
+                for (let suffix of suffixes) {
+                    if (current.length > suffix.length + 2 && current.endsWith(suffix)) {
+                        current = current.substring(0, current.length - suffix.length);
+                        break; 
+                    }
+                }
+            }
+            return current;
+        }
+
+        // 3. Jaccard Similarity & Tokenization
+        function getJaccardSimilarity(str1, str2) {
+            const stopWords = ['ve', 'ile', 'ama', 'fakat', 'lakin', 'bir', 'bu', 'şu', 'o', 'ben', 'sen', 'biz', 'mi', 'mı', 'mu', 'mü', 'için', 'gibi'];
+            const tokenize = (text) => {
+                return new Set(text.split(/\s+/).map(w => w.trim()).filter(w => w.length > 1 && !stopWords.includes(w)));
+            };
+            const set1 = tokenize(str1);
+            const set2 = tokenize(str2);
+            if (set1.size === 0 || set2.size === 0) return 0;
+            const intersection = new Set([...set1].filter(x => set2.has(x)));
+            const union = new Set([...set1, ...set2]);
+            return intersection.size / union.size;
+        }
+
+        // 4. SMART GROUPING ALGORITHM (Main Logic)
+        function smartGroupAnswers(answers) {
+            let processedItems = []; 
+            answers.forEach(a => {
+                let clean = a.trim().toLocaleUpperCase('tr-TR').replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"");
+                if (clean.length > 0) {
+                    processedItems.push({
+                        original: a,
+                        clean: clean,
+                        stem: simpleTurkishStemmer(clean)
+                    });
+                }
+            });
+
+            let groups = []; 
+
+            processedItems.forEach(item => {
+                let foundGroup = false;
+                for (let group of groups) {
+                    let mainKey = group.key;
+                    let itemKey = item.clean;
+
+                    // A. Exact Match
+                    if (mainKey === itemKey) { group.count++; foundGroup = true; break; }
+
+                    // B. Levenshtein (Typos)
+                    let allowedDist = (mainKey.length > 6) ? 2 : 1;
+                    if (levenshtein(mainKey, itemKey) <= allowedDist) { group.count++; foundGroup = true; break; }
+
+                    // C. Stemming (Suffixes)
+                    if (simpleTurkishStemmer(mainKey) === item.stem) { group.count++; foundGroup = true; break; }
+
+                    // D. Jaccard / Containment (Phrases)
+                    if (getJaccardSimilarity(mainKey, itemKey) > 0.5 || mainKey.includes(item.stem) || itemKey.includes(group.stem)) {
+                        group.count++; foundGroup = true; break;
+                    }
+                }
+
+                if (!foundGroup) {
+                    groups.push({ key: item.clean, stem: item.stem, count: 1 });
+                }
+            });
+
+            return groups
+                .map(g => {
+                    let score = g.count * 10; 
+                    return { text: g.key, points: score, count: g.count };
+                })
+                .sort((a,b) => b.count - a.count);
+        }
+
+        function calculateCurrentRoundVotes() {
+            const targetRound = currentRound; 
+            const rawAnswers = audienceVotes[targetRound] || [];
+            
+            if (rawAnswers.length === 0) {
+                showInfoPopup("VERİ YOK", "Bu tur için henüz oy gelmemiş.");
+                return;
+            }
+
+            const sorted = smartGroupAnswers(rawAnswers);
+            syncAdminState(sorted); 
+            showInfoPopup("HESAPLANDI", `${targetRound}. Tur Verileri Rejiye Gönderildi`);
+        }
+
+        function applyEditedVotes(answers) {
+             if (currentQuestions[currentRound-1]) {
+                const limit = 6; 
+                currentQuestions[currentRound-1].answers = answers.slice(0, limit);
+                
+                // SHOW ANIMATION FIRST
+                const overlay = document.getElementById('audience-calc-overlay');
+                const bar = document.getElementById('audience-calc-bar');
+                overlay.classList.remove('hidden');
+                overlay.classList.add('flex');
+                
+                // Reset bar
+                bar.style.transition = 'none';
+                bar.style.width = '0%';
+                
+                // Trigger reflow
+                void bar.offsetWidth;
+                
+                // Animate
+                bar.style.transition = 'width 3s cubic-bezier(0.4, 0, 0.2, 1)';
+                bar.style.width = '100%';
+                
+                playTone(300, 'sine', 3.0); // Build up sound
+
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                    overlay.classList.remove('flex');
+                    
+                    renderGame(currentRound-1);
+                    setTimeout(() => {
+                        document.getElementById('board-grid').classList.add('board-visible');
+                        playTone(600, 'sine', 0.5); // Ta-da sound
+                    }, 100);
+                    showInfoPopup("HESAPLANDI", "Tahta Güncellendi!");
+                }, 3000);
+            }
+        }
+
+        function manualSetTurn(teamIdx) {
+            if(isRiskMode && riskLives[teamIdx] <= 0) {
+                showInfoPopup("TAKIM ELENDİ", "Bu takımın canı kalmadı!");
+                return;
+            }
+            activeTeam = teamIdx;
+            highlightActiveTeam();
+            showInfoPopup("SIRA DEĞİŞTİ", `Sıra ${teamNames[teamIdx]} Takımına Verildi`);
+            syncAdminState();
+        }
+        
+        // HOST: Sync State to Admin
+        function syncAdminState(calculatedVotes = null) {
+            if(!hostPeer) return;
+            
+            let qData = {};
+            if (currentQuestions.length > 0 && currentRound > 0 && currentRound <= currentQuestions.length) {
+                qData = currentQuestions[currentRound-1];
+            }
+            
+            let revealedIndices = [];
+            document.querySelectorAll('.card-inner.flipped').forEach(el => {
+                const id = el.id.split('-')[1];
+                if(id) revealedIndices.push(parseInt(id));
+            });
+            if(isChainMode) revealedIndices = [chainStep];
+            
+            const currentBuzzedTeam = buzzerLocked ? activeTeam : -1;
+            
+            // Count total votes across all rounds
+            let totalVotes = 0;
+            Object.values(audienceVotes).forEach(arr => totalVotes += arr.length);
+
+            const state = {
+                type: 'ADMIN_SYNC',
+                scores: teamScores,
+                teamNames: teamNames,
+                currentRound: currentRound,
+                question: qData,
+                isChainMode: isChainMode,
+                isWordleMode: isWordleMode,
+                activeTeam: activeTeam,
+                buzzedTeam: currentBuzzedTeam,
+                strikeCount: strikeCount,
+                allSets: appData.sets.map(s => ({id: s.id, name: s.name})),
+                revealedIndices: revealedIndices,
+                gameEnded: document.getElementById('screen-gameover').classList.contains('screen-active'),
+                winner: document.getElementById('winner-name').innerText,
+                voteCount: totalVotes,
+                isVotingOpen: isVotingOpen,
+                activeRoundsForVoting: activeRoundsForVoting,
+                activeVotingData: activeVotingData, 
+                calculatedVotes: calculatedVotes 
+            };
+            
+            const contestantState = {
+                type: 'STATE_UPDATE',
+                teamNames: teamNames,
+                buzzedTeam: currentBuzzedTeam
+            };
+
+            Object.values(hostPeer.connections).forEach(conns => {
+                conns.forEach(c => {
+                    c.send(state);
+                    c.send(contestantState);
+                });
+            });
+        }
+
+        // ADMIN: Update UI based on Sync
+        function updateAdminUI(data) {
+            if (data.gameEnded) {
+                const qBox = document.getElementById('admin-current-question');
+                qBox.innerHTML = "<span class='text-red-500 font-bold'>OYUN BİTTİ! KAZANAN: " + data.winner + "</span>";
+            }
+
+            document.getElementById('admin-team-0-name').innerText = data.teamNames[0];
+            document.getElementById('admin-team-1-name').innerText = data.teamNames[1];
+            document.getElementById('admin-score-0').innerText = data.scores[0];
+            document.getElementById('admin-score-1').innerText = data.scores[1];
+            
+            let strikesText = "";
+            for(let i=0; i<data.strikeCount; i++) strikesText += "X ";
+            
+            document.getElementById('admin-strikes-0').innerText = (data.activeTeam === 0) ? strikesText : "";
+            document.getElementById('admin-strikes-1').innerText = (data.activeTeam === 1) ? strikesText : "";
+
+            document.getElementById('admin-box-0').classList.remove('active-turn', 'buzzed');
+            document.getElementById('admin-box-1').classList.remove('active-turn', 'buzzed');
+            document.getElementById('admin-buzz-0').classList.add('hidden');
+            document.getElementById('admin-buzz-1').classList.add('hidden');
+
+            if (data.activeTeam === 0) document.getElementById('admin-box-0').classList.add('active-turn');
+            if (data.activeTeam === 1) document.getElementById('admin-box-1').classList.add('active-turn');
+
+            if (data.buzzedTeam !== -1) {
+                if (data.buzzedTeam === 0) {
+                    document.getElementById('admin-box-0').classList.add('buzzed');
+                    document.getElementById('admin-buzz-0').classList.remove('hidden');
+                } else if (data.buzzedTeam === 1) {
+                    document.getElementById('admin-box-1').classList.add('buzzed');
+                    document.getElementById('admin-buzz-1').classList.remove('hidden');
+                }
+            }
+            
+            const qBox = document.getElementById('admin-current-question');
+            if (!data.gameEnded) {
+                if (data.question && data.question.question) {
+                    qBox.innerText = data.question.question + (data.question.type ? " [" + data.question.type.toUpperCase() + "]" : "");
+                } else {
+                    qBox.innerText = "Soru Yok / Bekleniyor";
+                }
+            }
+
+            // Wordle Input Visibility
+            const wordlePanel = document.getElementById('admin-wordle-panel');
+            if (data.isWordleMode) {
+                wordlePanel.style.display = 'block';
+            } else {
+                wordlePanel.style.display = 'none';
+            }
+
+            // Cheat Sheet Update
+            const cheatSheet = document.getElementById('admin-cheat-sheet');
+            cheatSheet.innerHTML = "";
+            if (data.question && data.question.answers) {
+                data.question.answers.forEach((ans, idx) => {
+                    const row = document.createElement('div');
+                    row.className = "cheat-row";
+                    let text = ans.text;
+                    if(data.question.type === 'chain' && ans.qText) text = `S: ${ans.qText} -> C: ${ans.text}`;
+                    
+                    const isRevealed = data.revealedIndices && data.revealedIndices.includes(idx);
+                    const style = isRevealed ? "color: #4ade80; font-weight: bold;" : "";
+
+                    row.innerHTML = `<span class="cheat-answer" style="${style}">${idx+1}. ${text} (${ans.points})</span>`;
+                    cheatSheet.appendChild(row);
+                });
+            }
+            // Check for target or targets
+            if (data.question && (data.question.target || data.question.targets)) {
+                 const row = document.createElement('div');
+                 row.className = "cheat-row bg-red-900";
+                 const targetsText = data.question.targets ? data.question.targets.join(', ') : data.question.target;
+                 row.innerHTML = `<span class="cheat-answer font-bold text-yellow-400">HEDEF: ${targetsText}</span>`;
+                 cheatSheet.prepend(row);
+            }
+
+            document.getElementById('admin-vote-count').innerText = `Gelen: ${data.voteCount || 0}`;
+            document.getElementById('admin-vote-status').innerText = data.isVotingOpen ? "DURUM: AÇIK" : "DURUM: KAPALI";
+            document.getElementById('admin-vote-status').className = data.isVotingOpen ? "text-xs font-bold text-green-400 animate-pulse" : "text-xs font-bold text-white";
+
+            // Manual Editor Populator
+            const editor = document.getElementById('admin-vote-editor');
+            const editArea = document.getElementById('admin-vote-edit-area');
+            if (data.calculatedVotes) {
+                 editor.classList.remove('hidden');
+                 let txt = "";
+                 data.calculatedVotes.slice(0, 8).forEach(v => {
+                     txt += `${v.text}=${v.points}\n`;
+                 });
+                 editArea.value = txt;
+            } else if (data.isVotingOpen) {
+                editor.classList.add('hidden'); // Oylama sırasında gizle
+            }
+
+            const setSelect = document.getElementById('admin-set-select');
+            if (setSelect.options.length === 0 && data.allSets) {
+                data.allSets.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.innerText = s.name;
+                    setSelect.appendChild(opt);
+                });
+            }
+            if(document.getElementById('admin-team-input-1').value === "") 
+                document.getElementById('admin-team-input-1').value = data.teamNames[0];
+            if(document.getElementById('admin-team-input-2').value === "") 
+                document.getElementById('admin-team-input-2').value = data.teamNames[1];
+        }
+
+        // PRESENTER: Update UI
+        function updatePresenterUI(data) {
+            document.getElementById('presenter-team-0-name').innerText = data.teamNames[0];
+            document.getElementById('presenter-team-1-name').innerText = data.teamNames[1];
+            document.getElementById('presenter-score-0').innerText = data.scores[0];
+            document.getElementById('presenter-score-1').innerText = data.scores[1];
+
+            let strikesText = "";
+            for(let i=0; i<data.strikeCount; i++) strikesText += "X ";
+            document.getElementById('presenter-strikes-0').innerText = (data.activeTeam === 0) ? strikesText : "";
+            document.getElementById('presenter-strikes-1').innerText = (data.activeTeam === 1) ? strikesText : "";
+
+            const b0 = document.getElementById('presenter-team-0-box');
+            const b1 = document.getElementById('presenter-team-1-box');
+            b0.classList.remove('active', 'buzzed');
+            b1.classList.remove('active', 'buzzed');
+
+            if (data.activeTeam === 0) b0.classList.add('active');
+            if (data.activeTeam === 1) b1.classList.add('active');
+
+            if (data.buzzedTeam === 0) b0.classList.add('buzzed');
+            if (data.buzzedTeam === 1) b1.classList.add('buzzed');
+
+            let status = "Bekleniyor...";
+            if (data.gameEnded) status = "OYUN BİTTİ! KAZANAN: " + data.winner;
+            else if (data.buzzedTeam !== -1) status = data.teamNames[data.buzzedTeam] + " BUTONA BASTI!";
+            else if (data.activeTeam !== -1) status = "SIRA: " + data.teamNames[data.activeTeam];
+            document.getElementById('presenter-status-log').innerText = status;
+
+            if (data.question && data.question.question) {
+                document.getElementById('presenter-question-text').innerText = data.question.question;
+            }
+
+            const list = document.getElementById('presenter-answers-list');
+            list.innerHTML = "";
+            if (data.question && data.question.answers) {
+                data.question.answers.forEach((ans, idx) => {
+                    const row = document.createElement('div');
+                    const isRevealed = data.revealedIndices && data.revealedIndices.includes(idx);
+                    row.className = "presenter-answer-row " + (isRevealed ? "revealed" : "hidden-ans");
+                    
+                    let text = ans.text;
+                    if(data.question.type === 'chain') text = `S: ${ans.qText} -> C: ${ans.text}`;
+
+                    row.innerHTML = `
+                        <span>${idx+1}. ${text}</span>
+                        <span>${ans.points} P</span>
+                    `;
+                    list.appendChild(row);
+                });
+            }
+        }
+
+        function switchAdminTab(tab) {
+            document.getElementById('tab-controls-content').style.display = tab === 'controls' ? 'block' : 'none';
+            document.getElementById('tab-setup-content').style.display = tab === 'setup' ? 'block' : 'none';
+            document.getElementById('tab-controls-btn').className = tab === 'controls' ? 'admin-tab-btn active' : 'admin-tab-btn';
+            document.getElementById('tab-setup-btn').className = tab === 'setup' ? 'admin-tab-btn active' : 'admin-tab-btn';
+        }
+
+        // --- DATA & CONFIG ---
+        
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // Varsayılan Dummy Veri
+        const generateDummyQuestions = (setNum) => {
+            let riskPool = [
+                {text: "CEVAP 1", points: 100},
+                {text: "CEVAP 2", points: 150},
+                {text: "CEVAP 3", points: -50}, 
+                {text: "CEVAP 4", points: -100}, 
+                {text: "CEVAP 5", points: 50}, 
+                {text: "CEVAP 6", points: 100} 
+            ];
+
+            if (setNum === 2) {
+                riskPool = [
+                    {text: "CEVAP 1", points: 100},
+                    {text: "CEVAP 2", points: 150},
+                    {text: "CEVAP 3", points: -50},
+                    {text: "CEVAP 4", points: -100},
+                    {text: "CEVAP 5", points: -8888}, // HEDIYE CODE
+                    {text: "CEVAP 6", points: 100}
+                ];
+            }
+
+            const shuffledRisks = shuffleArray([...riskPool]);
+
+            return [
+                // 1. TUR: NORMAL
+                { 
+                    type: 'normal',
+                    question: `Bölüm ${setNum} - Soru 1: [Normal Tur]`, 
+                    answers: [
+                        {text: "CEVAP 1", points: 40}, 
+                        {text: "CEVAP 2", points: 30}, 
+                        {text: "CEVAP 3", points: 15}, 
+                        {text: "CEVAP 4", points: 10}, 
+                        {text: "CEVAP 5", points: 5},
+                        {text: "CEVAP 6", points: 3}
+                    ] 
+                },
+                // 2. TUR: NORMAL
+                { 
+                    type: 'normal',
+                    question: `Bölüm ${setNum} - Soru 2: [Normal Tur]`, 
+                    answers: [
+                        {text: "CEVAP 1", points: 35}, 
+                        {text: "CEVAP 2", points: 25}, 
+                        {text: "CEVAP 3", points: 20}, 
+                        {text: "CEVAP 4", points: 10}, 
+                        {text: "CEVAP 5", points: 5},
+                        {text: "CEVAP 6", points: 5}
+                    ] 
+                },
+                // 3. TUR: ZİNCİR MODU
+                {
+                    type: 'chain',
+                    question: `Bölüm ${setNum} - ZİNCİR ETABI`,
+                    answers: [
+                        {qText: "İstanbul'un Plakası?", text: "34", points: 10},
+                        {qText: "Türkiye'nin Başkenti?", text: "ANKARA", points: 10},
+                        {qText: "Su kaç derecede kaynar?", text: "100", points: 10},
+                        {qText: "En büyük kıta?", text: "ASYA", points: 10},
+                        {qText: "Bir yılda kaç hafta var?", text: "52", points: 10},
+                        {qText: "Ay'a ilk kim bastı?", text: "ARMSTRONG", points: 10},
+                        {qText: "Futbol maçı kaç dakika?", text: "90", points: 10}
+                    ]
+                },
+                // 4. TUR: RİSK
+                { 
+                    type: 'risk',
+                    question: `Bölüm ${setNum} - RİSK ETABI [Kutunu Seç]`, 
+                    answers: shuffledRisks
+                },
+                // 5. TUR: WORDLE 1
+                {
+                    type: 'wordle',
+                    question: `Bölüm ${setNum} - WORDLE ETABI (1. Kelime)`,
+                    target: "BORSA", 
+                    points: 100
+                },
+                // 6. TUR: WORDLE 2
+                {
+                    type: 'wordle',
+                    question: `Bölüm ${setNum} - WORDLE ETABI (2. Kelime)`,
+                    target: "KREDİ", 
+                    points: 100
+                }
+            ];
+        };
+
+        const defaultTeams = [
+            "İşletme Topluluğu", "Hukuk Kulübü", "Mimarlık", "Mühendislik", 
+            "Psikoloji", "Girişimcilik", "Finans", "Uluslararası Ticaret",
+            "Halkla İlişkiler", "Gastronomi", "Yazılım", "Akademisyenler", "Mezunlar"
+        ];
+
+        let initialSets = [];
+        for(let i=1; i<=15; i++) {
+            initialSets.push({
+                id: i,
+                name: `Bölüm ${i} (6 Tur)`,
+                questions: generateDummyQuestions(i)
+            });
+        }
+
+        let appData = {
+            sets: initialSets,
+            teams: defaultTeams
+        };
+
+        let currentQuestions = [];
+        let currentRound = 0;
+        let roundPoints = 0;
+        let teamNames = ["Takım A", "Takım B"];
+        let teamScores = [0, 0];
+        let strikeCount = 0;
+        let activeTeam = -1;
+        let isStealMode = false;
+        
+        let buzzerLocked = false;
+        let isContentRevealed = false;
+        
+        // --- NEW: Kilitli 'Tümünü Aç' (V) değişkeni ---
+        let canRevealAll = false;
+        let wordleRevealed = false;
+        
+        let isFaceOffPhase = true;
+        let faceOffStep = 0; 
+        let faceOffScores = [0, 0];
+        let firstBuzzTeam = -1;
+        let faceOffMissOccurred = false;
+
+        let isChainMode = false;
+        let chainStep = 0;
+        let chainQuestionOpen = true; 
+        let chainMissCount = 0;
+        
+        let isRiskMode = false;
+        let riskLives = [2, 2];
+
+        // --- WORDLE VARS ---
+        let isWordleMode = false;
+        let wordleTarget = "";
+        let wordleGuesses = []; 
+        let wordleCurrentInput = "";
+        let wordleMaxGuesses = 5;
+        let wordleTurnIndex = 0; 
+
+        let audioCtx = null;
+        let isMusicOn = true; 
+        
+        // --- TUTORIAL VARS ---
+        let tutorialStep = 0;
+        const tutorialModes = ['sim-normal', 'sim-chain', 'sim-wordle', 'sim-risk'];
+
+        // --- INIT ---
+        window.onload = function() {
+            const saved = localStorage.getItem('tradeWarsData_v38'); 
+            if(saved) {
+                appData = JSON.parse(saved);
+                if(!appData.teams) appData.teams = defaultTeams;
+            }
+            showScreen('screen-intro');
+            document.addEventListener('keydown', handleKeydown);
+            document.addEventListener('mousedown', handleBuzzerClick);
+        };
+
+        function handleBuzzerClick(e) {
+            if (document.getElementById('screen-remote').classList.contains('screen-active')) {
+                 if (e.button === 0) sendBuzz(0);
+                 else if (e.button === 2) sendBuzz(1);
+                 return;
+            }
+            return;
+        }
+
+        function activateBuzzer(teamIndex) {
+            buzzerLocked = true;
+            playBuzzerSound();
+            
+            const overlay = document.getElementById('buzzer-overlay');
+            const nameEl = document.getElementById('buzzer-team-name');
+            nameEl.innerText = teamNames[teamIndex];
+            overlay.style.display = 'flex';
+            
+            activeTeam = teamIndex;
+            highlightActiveTeam();
+
+            if(isChainMode) {
+                syncAdminState();
+                return;
+            }
+            if(isWordleMode) {
+                wordleTurnIndex = teamIndex;
+                syncAdminState();
+                return;
+            }
+
+            if (isFaceOffPhase && faceOffStep === 0) {
+                firstBuzzTeam = teamIndex;
+                faceOffStep = 1; 
+            }
+            syncAdminState();
+        }
+
+        function closeBuzzerOverlay() {
+            document.getElementById('buzzer-overlay').style.display = 'none';
+        }
+
+        function showInfoPopup(title, sub) {
+            const popup = document.getElementById('info-popup');
+            document.getElementById('info-popup-title').innerText = title;
+            document.getElementById('info-popup-sub').innerText = sub;
+            popup.style.display = 'block';
+            setTimeout(() => {
+                popup.style.display = 'none';
+            }, 2500);
+        }
+
+        // --- TYPEWRITER & REVEAL LOGIC ---
+        function revealContent() {
+            if(isContentRevealed) return;
+            isContentRevealed = true;
+            
+            const readyOverlay = document.getElementById('ready-overlay');
+            readyOverlay.style.transition = 'opacity 0.5s ease-in-out, visibility 0.5s';
+            readyOverlay.style.opacity = '0';
+            readyOverlay.style.visibility = 'hidden';
+
+            const qIndex = currentRound - 1;
+            const q = currentQuestions[qIndex];
+            
+            if (isChainMode || isWordleMode) {
+                renderGame(qIndex);
+                setTimeout(() => {
+                    document.getElementById('board-grid').classList.add('board-visible');
+                }, 100);
+            } else {
+                const fullText = q ? q.question : "Soru bulunamadı";
+                typeWriter(fullText, 'question-text-container', 40); 
+            }
+        }
+
+        function typeWriter(text, elementId, speed) {
+            let i = 0;
+            const target = document.getElementById(elementId);
+            target.innerHTML = "";
+            document.getElementById('typewriter-cursor').style.display = 'inline-block';
+            
+            function type() {
+                if (i < text.length) {
+                    target.innerHTML += text.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                } else {
+                    document.getElementById('typewriter-cursor').style.display = 'none';
+                    setTimeout(() => {
+                        document.getElementById('board-grid').classList.add('board-visible');
+                    }, 300);
+                }
+            }
+            type();
+        }
+
+        // --- REVEAL ALL (V) LOGIC ---
+        function revealAllRemaining() {
+            if (!canRevealAll) {
+                showInfoPopup("KİLİTLİ", "Oyun devam ederken tüm cevaplar açılamaz!");
+                return;
+            }
+
+            if (isWordleMode) {
+                if (!wordleGuesses.includes(wordleTarget)) {
+                    wordleRevealed = true;
+                    renderWordleBoard();
+                    playSuspenseSound(); 
+                    syncAdminState();
+                }
+            } else if (!isChainMode) {
+                // Normal & Risk mode
+                const unflipped = document.querySelectorAll('#board-grid .card-inner:not(.flipped)');
+                if (unflipped.length === 0) return;
+                
+                unflipped.forEach((card, idx) => {
+                    setTimeout(() => {
+                        card.classList.add('flipped');
+                        playTone(600, 'sine', 0.1, 0.2); 
+                        syncAdminState();
+                    }, idx * 300); 
+                });
+            }
+        }
+
+        function handleKeydown(e) {
+            if (!document.getElementById('admin-modal').classList.contains('hidden')) return;
+            executeGameAction(e.key.toUpperCase());
+        }
+
+        function executeGameAction(key) {
+             const gameScreen = document.getElementById('screen-game').classList.contains('screen-active');
+             const tutorialScreen = document.getElementById('screen-tutorial').classList.contains('screen-active');
+             const rulesScreen = document.getElementById('screen-rules').classList.contains('screen-active');
+
+             if (key === ' ' && document.getElementById('buzzer-overlay').style.display === 'flex') {
+                 closeBuzzerOverlay();
+                 return;
+             }
+             if (key === 'ENTER' && document.getElementById('buzzer-overlay').style.display === 'flex') {
+                 closeBuzzerOverlay();
+                 return;
+             }
+             
+             // Tutorial Screen Manual Step (ENTER / SPACE)
+             if (tutorialScreen && (key === 'ENTER' || key === ' ')) {
+                 stepTutorial();
+                 return;
+             }
+             
+             // Rules Screen Navigation
+             if (rulesScreen && (key === 'ENTER')) {
+                 goToGameFromRules();
+                 return;
+             }
+
+             // Reveal All (V) Shortcut Check
+             if (key === 'V') {
+                 revealAllRemaining();
+                 return;
+             }
+
+             // WORDLE INPUT HANDLING
+             if (gameScreen && isWordleMode && isContentRevealed) {
+                 if (activeTeam !== -1 && !canRevealAll) {
+                     if (/^[A-ZĞÜŞİÖÇ]$/.test(key) && key.length === 1) {
+                         if (wordleCurrentInput.length < 5) {
+                             wordleCurrentInput += key;
+                             renderWordleBoard();
+                         }
+                         return; 
+                     }
+                     if (key === 'BACKSPACE') {
+                         wordleCurrentInput = wordleCurrentInput.slice(0, -1);
+                         renderWordleBoard();
+                         return;
+                     }
+                     if (key === 'ENTER') {
+                         submitWordleGuess();
+                         return;
+                     }
+                     return; // Diğer tüm tuşları (oklar, X, Z vb) harf girilirken devredışı bırak
+                 }
+             }
+
+             if (key === '+') { toggleMusic(); return; }
+
+             // NAVIGATION SHORTCUTS
+            if (!gameScreen && (key === 'ENTER')) {
+                const introScreen = document.getElementById('screen-intro').classList.contains('screen-active');
+                const setupScreen = document.getElementById('screen-setup').classList.contains('screen-active');
+                const remoteSetup = document.getElementById('screen-remote-setup').classList.contains('screen-active');
+                const adminSetup = document.getElementById('screen-admin-setup').classList.contains('screen-active');
+                const presenterSetup = document.getElementById('screen-presenter-setup').classList.contains('screen-active');
+                const audienceSetup = document.getElementById('screen-audience-setup').classList.contains('screen-active');
+                const gameOverScreen = document.getElementById('screen-gameover').classList.contains('screen-active');
+                const waitingScreen = document.getElementById('screen-waiting').classList.contains('screen-active');
+                const welcomeScreen = document.getElementById('screen-welcome').classList.contains('screen-active');
+
+                if (introScreen) goToSetup();
+                else if (setupScreen) saveTeamsAndStart(); 
+                else if (welcomeScreen) showScreen('screen-tutorial'); 
+                else if (remoteSetup) connectToHost('contestant');
+                else if (adminSetup) connectToHost('admin');
+                else if (presenterSetup) connectToHost('presenter');
+                else if (audienceSetup) connectToHost('audience');
+                else if (gameOverScreen) { 
+                    goToWaitingScreen(); 
+                    syncAdminState(); 
+                }
+                else if (waitingScreen) { resetGame(); showScreen('screen-intro'); }
+                return;
+            }
+
+            if (!gameScreen) return;
+
+            // --- GAME SCREEN LOGIC ---
+
+            if (key === 'ENTER' || key === ' ') {
+                if (!isContentRevealed) {
+                    revealContent();
+                    return;
+                }
+                
+                // CHAIN MODE LOGIC
+                if (isChainMode) {
+                    const qData = currentQuestions[currentRound-1].answers[chainStep];
+                    if (!qData) return;
+                    if (chainStep === 0 && chainQuestionOpen && activeTeam !== -1) {
+                        playCorrectSound(); flipChainCard(activeTeam); addPointsToTeam(activeTeam, qData.points); chainQuestionOpen = false; chainMissCount = 0; showInfoPopup("DOĞRU!", "Sıra Sizde!"); stopTimer(); return;
+                    }
+                    if (!chainQuestionOpen) {
+                        chainStep++;
+                        chainMissCount = 0;
+                        if (chainStep >= currentQuestions[currentRound-1].answers.length) {
+                            canRevealAll = true; activeTeam = -1; stopTimer(); showInfoPopup("ZİNCİR BİTTİ", "Sonraki Tura Geçebilirsiniz"); syncAdminState();
+                        }
+                        else { chainQuestionOpen = true; renderChainCard(); }
+                        return;
+                    }
+                    if (chainQuestionOpen && activeTeam !== -1) {
+                        playCorrectSound(); flipChainCard(activeTeam); addPointsToTeam(activeTeam, qData.points); chainQuestionOpen = false; chainMissCount = 0; stopTimer(); return;
+                    }
+                    return;
+                }
+            }
+
+            // Number Keys Logic (Normal & Risk)
+            if (!isChainMode && !isWordleMode && key >= '1' && key <= '6') {
+                const index = parseInt(key) - 1;
+                const currentQ = currentQuestions[(currentRound-1)];
+                if (currentQ && currentQ.answers[index]) revealAnswer(index, currentQ.answers[index].points);
+            }
+            
+            // Buzzer / Selection Keys
+            if (key === 'ARROWLEFT' || key === 'A') {
+                if (!buzzerLocked && !isStealMode && !isChainMode) { 
+                      const readyOverlay = document.getElementById('ready-overlay');
+                      if(readyOverlay.style.visibility === 'hidden' || readyOverlay.style.opacity === '0') {
+                          activateBuzzer(0);
+                      }
+                }
+            }
+            if (key === 'ARROWRIGHT' || key === 'B') {
+                 if (!buzzerLocked && !isStealMode && !isChainMode) {
+                      const readyOverlay = document.getElementById('ready-overlay');
+                      if(readyOverlay.style.visibility === 'hidden' || readyOverlay.style.opacity === '0') {
+                          activateBuzzer(1);
+                      }
+                }
+            }
+            
+            if (key === 'X') {
+                stopTimer();
+                if (isChainMode) {
+                    if (!chainQuestionOpen) return; 
+                    playWrongSound();
+                    chainMissCount++;
+                    if (chainMissCount === 1) {
+                        const otherTeam = (activeTeam === 0) ? 1 : 0;
+                        activeTeam = otherTeam;
+                        highlightActiveTeam();
+                        showInfoPopup("SIRA GEÇTİ", "Sıra Karşı Takımda!");
+                    } else {
+                        showInfoPopup("KİMSE BİLEMEDİ!", "Doğru Cevap Açılıyor...");
+                        flipChainCard(-1); 
+                        chainQuestionOpen = false;
+                        setTimeout(() => {
+                            activeTeam = (activeTeam === 0) ? 1 : 0;
+                            highlightActiveTeam();
+
+                            chainStep++;
+                            chainMissCount = 0;
+                            if (chainStep >= currentQuestions[currentRound-1].answers.length) {
+                                canRevealAll = true; activeTeam = -1; showInfoPopup("ZİNCİR BİTTİ", "Sonraki Tura Geçebilirsiniz");
+                            } else {
+                                chainQuestionOpen = true;
+                                renderChainCard();
+                            }
+                            syncAdminState();
+                        }, 3000);
+                    }
+                } else if(isRiskMode) {
+                    if(activeTeam === -1) showInfoPopup("HATA", "Takım seçili değil!");
+                    else triggerStrike();
+                } else if(!isWordleMode) { 
+                    triggerStrike();
+                }
+            }
+
+            if (key === 'S' && isChainMode) {
+                if (chainQuestionOpen) { flipChainCard(-1); chainQuestionOpen = false; }
+            }
+            if (key === 'Z' && !isChainMode && !isRiskMode && !isWordleMode) triggerSilentStrike();
+            
+            if (key === 'Z' && isRiskMode) {
+                 stopTimer();
+                 if(activeTeam !== -1) {
+                    const otherTeam = (activeTeam === 0) ? 1 : 0;
+                    if(riskLives[otherTeam] > 0) { activeTeam = otherTeam; highlightActiveTeam(); showInfoPopup("PAS", `Sıra ${teamNames[otherTeam]}'a geçti.`); }
+                    else { showInfoPopup("GEÇEMEZ", "Rakip elendi, sıra değişemez!"); }
+                    syncAdminState();
+                 }
+            }
+            
+            if (key === 'C') finishRound(); 
+            
+            syncAdminState(); 
+        }
+
+        // --- FACE-OFF STRIKE LOGIC ---
+        function handleFaceOffStrike() {
+            if (faceOffStep === 1) {
+                faceOffMissOccurred = true;
+                firstBuzzTeam = (firstBuzzTeam === 0) ? 1 : 0;
+                activeTeam = firstBuzzTeam; 
+                highlightActiveTeam();
+                showInfoPopup("SIRA DEĞİŞTİ", `Sıra ${teamNames[activeTeam]} Takımında!`);
+            } else if (faceOffStep === 2) {
+                activeTeam = firstBuzzTeam; 
+                highlightActiveTeam();
+                isFaceOffPhase = false;
+                showInfoPopup("KONTROL SAĞLANDI", `Kontrol ${teamNames[activeTeam]} Takımında!`);
+            }
+        }
+
+        // --- WORDLE LOGIC ---
+        function submitWordleGuess() {
+            if (wordleCurrentInput.length !== 5) {
+                showInfoPopup("EKSİK", "5 Harfli Olmalı");
+                return;
+            }
+            stopTimer();
+            
+            wordleGuesses.push(wordleCurrentInput);
+            let attemptsUsed = wordleGuesses.length;
+            const guess = wordleCurrentInput;
+            wordleCurrentInput = "";
+            renderWordleBoard();
+
+            if (guess === wordleTarget) {
+                playCorrectSound();
+                fireConfetti();
+                let earned = 100 - ((attemptsUsed - 1) * 20); 
+                if (attemptsUsed === 5) earned = earned * 2; 
+                addPointsToTeam(activeTeam, earned);
+                showInfoPopup("TEBRİKLER!", `${earned} Puan Kazandınız!`);
+                canRevealAll = true;
+                activeTeam = -1; 
+                highlightActiveTeam();
+            } else {
+                if (attemptsUsed === 4) {
+                    playWrongSound();
+                    activeTeam = (activeTeam === 0) ? 1 : 0;
+                    highlightActiveTeam();
+                    showInfoPopup("SIRA GEÇTİ!", "Son hak " + teamNames[activeTeam] + " takımında!");
+                } else if (attemptsUsed >= 5) {
+                    playWrongSound();
+                    showInfoPopup("KİMSE BİLEMEDİ", "V Tuşu ile cevabı görebilirsiniz.");
+                    canRevealAll = true;
+                    activeTeam = -1;
+                    highlightActiveTeam();
+                } else {
+                    playWrongSound();
+                    showInfoPopup("YANLIŞ!", `${5 - attemptsUsed} Hakkınız Kaldı`);
+                }
+            }
+            syncAdminState();
+        }
+
+        function renderWordleBoard(revealOverride = false) {
+            const board = document.getElementById('board-grid');
+            let html = '<div class="wordle-container">';
+            
+            for (let i = 0; i < wordleMaxGuesses; i++) {
+                html += '<div class="wordle-row">';
+                const guess = wordleGuesses[i] || (i === wordleGuesses.length ? wordleCurrentInput : "");
+                
+                for (let j = 0; j < 5; j++) {
+                    const letter = guess[j] || "";
+                    let className = "wordle-cell";
+                    
+                    if (i < wordleGuesses.length) {
+                        const correctChar = wordleTarget[j];
+                        if (letter === correctChar) {
+                            className += " w-correct";
+                        } else if (wordleTarget.includes(letter)) {
+                            className += " w-present";
+                        } else {
+                            className += " w-absent";
+                        }
+                    } else if (i === wordleGuesses.length && letter) {
+                        className += " w-filled";
+                    }
+                    
+                    html += `<div class="${className}">${letter}</div>`;
+                }
+                html += '</div>';
+            }
+            html += '</div>';
+            
+            // Eğer "V" ile cevap açıldıysa kutuyu ekle
+            if (wordleRevealed || revealOverride) {
+                html += `
+                <div class="w-full text-center mt-8" style="animation: zoomInFade 0.5s ease-out;">
+                    <div class="text-amber-400 text-lg font-bold tracking-widest mb-2">DOĞRU CEVAP</div>
+                    <div class="inline-block bg-green-600 border-4 border-white rounded-xl px-8 py-4 text-6xl font-black text-white tracking-[15px] shadow-[0_0_40px_rgba(34,197,94,0.8)]">
+                        ${wordleTarget}
+                    </div>
+                </div>
+                `;
+            }
+
+            board.innerHTML = html;
+        }
+
+        // --- TUTORIAL SIMULATION LOGIC ---
+        function initTutorialMode() {
+            tutorialStep = 0;
+            updateTutorialUI(0);
+        }
+
+        function updateTutorialUI(index) {
+             // Hide all
+            document.querySelectorAll('.sim-mode').forEach(el => {
+                el.classList.remove('sim-active');
+                el.classList.add('hidden'); 
+            });
+            // Show current
+            if (index < tutorialModes.length) {
+                const currentEl = document.getElementById(tutorialModes[index]);
+                if(currentEl) {
+                    currentEl.classList.remove('hidden');
+                    void currentEl.offsetWidth; 
+                    currentEl.classList.add('sim-active');
+                }
+                // Update dots
+                document.querySelectorAll('.sim-dot').forEach((d, i) => {
+                    if (i === index) d.classList.add('active');
+                    else d.classList.remove('active');
+                });
+            }
+        }
+
+        function stepTutorial() {
+            tutorialStep++;
+            if(tutorialStep < tutorialModes.length) {
+                updateTutorialUI(tutorialStep);
+            } else {
+                goToRulesScreen();
+            }
+        }
+
+        function goToRulesScreen() {
+            showScreen('screen-rules');
+        }
+
+        function goToGameFromRules() {
+            prepareNextRound();
+        }
+
+        // --- SUSPENSE MODE LOGIC ---
+        function triggerSuspense() {
+            playSuspenseSound();
+        }
+
+        // --- NAVIGATION & SETUP ---
+        function showScreen(id) {
+            document.querySelectorAll('.screen-section').forEach(el => el.classList.remove('screen-active'));
+            document.getElementById(id).classList.add('screen-active');
+            
+            if (id === 'screen-tutorial') {
+                initTutorialMode();
+            } 
+        }
+
+        function goToSetup() {
+            initAudio();
+            if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            if(!hostPeer) initHostPeer();
+
+            const setSelect = document.getElementById('game-set-select');
+            setSelect.innerHTML = '';
+            appData.sets.forEach(set => {
+                const opt = document.createElement('option');
+                opt.value = set.id;
+                opt.innerText = set.name;
+                setSelect.appendChild(opt);
+            });
+
+            // Ensure teams list exists (Fix for crash)
+            if(!appData.teams) appData.teams = defaultTeams;
+
+            const populateTeams = (elId) => {
+                const el = document.getElementById(elId);
+                el.innerHTML = '<option value="">-- Listeden Seç --</option>';
+                appData.teams.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t;
+                    opt.innerText = t;
+                    el.appendChild(opt);
+                });
+            };
+            populateTeams('team-select-1');
+            populateTeams('team-select-2');
+
+            showScreen('screen-setup');
+            setTimeout(() => document.getElementById('game-set-select').focus(), 500);
+        }
+
+        function saveTeamsAndStart() {
+            teamNames[0] = document.getElementById('setup-team-1').value || "Takım A";
+            teamNames[1] = document.getElementById('setup-team-2').value || "Takım B";
+            
+            const setId = parseInt(document.getElementById('game-set-select').value);
+            const selectedSet = appData.sets.find(s => s.id === setId);
+            
+            if(!selectedSet) { alert("Lütfen bir bölüm seçin."); return; }
+            
+            currentQuestions = JSON.parse(JSON.stringify(selectedSet.questions));
+            document.getElementById('header-set-name').innerText = selectedSet.name;
+
+            document.getElementById('display-team-0').innerText = teamNames[0];
+            document.getElementById('display-team-1').innerText = teamNames[1];
+            
+            teamScores = [0, 0];
+            updateScoreBoard();
+            currentRound = 0;
+            
+            showScreen('screen-welcome');
+        }
+
+        function goToWaitingScreen() { 
+            showScreen('screen-waiting');
+            syncAdminState(); 
+        }
+
+        function resetGame() {
+            teamScores = [0, 0];
+            currentRound = 0;
+            roundPoints = 0;
+            strikeCount = 0;
+            activeTeam = -1;
+            document.getElementById('score-0').innerText = "0";
+            document.getElementById('score-1').innerText = "0";
+            document.getElementById('setup-team-1').value = "Girişimciler";
+            document.getElementById('setup-team-2').value = "Yöneticiler";
+            document.getElementById('game-set-select').selectedIndex = 0;
+        }
+
+        // --- GAME LOGIC ---
+        function prepareNextRound() {
+            stopTimer();
+            canRevealAll = false;
+            wordleRevealed = false;
+            document.getElementById('question-text-container').innerText = "";
+            document.getElementById('board-grid').innerHTML = "";
+            document.getElementById('board-grid').classList.remove('board-visible');
+            
+            const readyOverlay = document.getElementById('ready-overlay');
+            readyOverlay.style.transition = 'none'; // Instant show
+            readyOverlay.style.visibility = 'visible';
+            readyOverlay.style.opacity = '1';
+            void readyOverlay.offsetWidth; // force reflow
+
+            currentRound++;
+            
+            if (currentQuestions.length === 0 || currentRound > currentQuestions.length) {
+                endGame();
+                return;
+            }
+
+            const qIndex = currentRound - 1;
+            const q = currentQuestions[qIndex];
+            
+            // Detect Mode
+            isChainMode = (q.type === 'chain');
+            isRiskMode = (q.type === 'risk');
+            isWordleMode = (q.type === 'wordle');
+            
+            chainStep = 0;
+            chainQuestionOpen = true;
+            chainMissCount = 0;
+            riskLives = [2, 2]; 
+            
+            // Wordle Init
+            if(isWordleMode) {
+                wordleTarget = q.target || (q.targets ? q.targets[0] : "BORSA");
+                wordleGuesses = [];
+                wordleCurrentInput = "";
+                wordleMaxGuesses = 5;
+            }
+
+            renderGame(qIndex);
+            
+            roundPoints = 0;
+            strikeCount = 0;
+            isStealMode = false;
+            
+            // Determine Starting Team Logic
+            if (isChainMode) {
+                activeTeam = teamScores[0] >= teamScores[1] ? 0 : 1; 
+                buzzerLocked = true; // disable buzzers
+                setTimeout(() => { showInfoPopup("ZİNCİR BAŞLIYOR", `${teamNames[activeTeam]} yüksek puanla başlıyor!`); }, 1500);
+            } else if (isWordleMode) {
+                activeTeam = -1; // Wait for buzz (Wordle etabı öncesi butona izin verir)
+                buzzerLocked = false;
+            } else {
+                activeTeam = -1;
+                buzzerLocked = false;
+            }
+
+            isContentRevealed = false;
+            isFaceOffPhase = (!isChainMode && !isWordleMode && !isRiskMode);
+
+            faceOffStep = 0;
+            firstBuzzTeam = -1;
+            faceOffScores = [0, 0];
+            faceOffMissOccurred = false;
+            
+            document.getElementById('steal-overlay').style.display = 'none';
+            document.getElementById('steal-btn-0').classList.add('hidden');
+            document.getElementById('steal-btn-1').classList.add('hidden');
+            
+            highlightActiveTeam(); 
+            
+            // Hide normal question box in Chain Mode
+            const normalBox = document.getElementById('normal-question-box');
+            if (isChainMode) normalBox.style.display = 'none';
+            else normalBox.style.display = 'block';
+
+            const badge = document.getElementById('multiplier-badge');
+            if (isChainMode) {
+                badge.style.display = 'block'; badge.innerText = "ZİNCİR ETABI";
+            } else if (isRiskMode) {
+                badge.style.display = 'block'; badge.innerText = "RİSK MODU";
+            } else if (isWordleMode) {
+                badge.style.display = 'block'; badge.innerText = "WORDLE ETABI";
+            } else {
+                badge.style.display = 'none';
+            }
+
+            updateRoundUI();
+            showScreen('screen-game');
+            syncAdminState(); 
+        }
+
+        function renderGame(qIndex) {
+            const q = currentQuestions[qIndex];
+            if(!q) return;
+
+            document.getElementById('header-round-num').innerText = currentRound;
+            const board = document.getElementById('board-grid');
+            board.innerHTML = '';
+            
+            document.getElementById('strike-display').innerHTML = '';
+            document.getElementById('round-points').innerText = "0";
+
+            if (isChainMode) {
+                board.className = "chain-container";
+                renderChainCard();
+            } else if (isWordleMode) {
+                board.className = "flex justify-center w-full";
+                renderWordleBoard();
+            } else {
+                board.className = "grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl";
+                q.answers.forEach((ans, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'answer-card h-20 md:h-24 w-full';
+                    card.style.animationDelay = (index * 0.1) + 's';
+                    card.classList.add('card-enter-active');
+                    card.onclick = () => revealAnswer(index, ans.points);
+                    card.innerHTML = `
+                        <div class="card-inner" id="card-${index}">
+                            <div class="card-front">
+                                <div class="number-badge">${index + 1}</div>
+                            </div>
+                            <div class="card-back ${isRiskMode ? 'risk-back-neutral' : ''}">
+                                <span class="truncate pr-2">${ans.text.toUpperCase()}</span>
+                                <span class="points-badge" style="${isRiskMode ? 'display:none' : ''}">${ans.points}</span>
+                            </div>
+                        </div>
+                    `;
+                    board.appendChild(card);
+                });
+            }
+        }
+
+        function renderChainCard() {
+            const board = document.getElementById('board-grid');
+            const qData = currentQuestions[currentRound-1].answers[chainStep];
+            if (!qData) { board.innerHTML = '<div class="text-4xl font-bold">ETAP BİTTİ!</div>'; return; }
+            board.innerHTML = `
+                <div class="chain-card-container">
+                    <div class="chain-card" id="chain-card-el">
+                        <div class="chain-face chain-front">
+                            <div class="chain-progress">SORU ${chainStep + 1} / ${currentQuestions[currentRound-1].answers.length}</div>
+                            <div class="chain-question-text">${qData.qText || `Soru ${chainStep + 1}`}</div>
+                        </div>
+                        <div class="chain-face chain-back">
+                            <div class="chain-answer-text">${qData.text}</div>
+                            <div class="chain-points">+${qData.points} PUAN</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function flipChainCard(winnerTeamIdx) {
+            const card = document.getElementById('chain-card-el');
+            if(card) {
+                card.classList.add('flipped');
+                const backFace = card.querySelector('.chain-back');
+                if (winnerTeamIdx === 0) backFace.style.background = '#2563eb';
+                else if (winnerTeamIdx === 1) backFace.style.background = '#dc2626';
+                else backFace.style.background = '#4b5563';
+                backFace.style.color = 'white';
+            }
+        }
+
+        function highlightActiveTeam() {
+            const t0 = document.getElementById('team-card-0');
+            const t1 = document.getElementById('team-card-1');
+            t0.classList.remove('team-spotlight-active', 'team-spotlight-dimmed', 'team-eliminated');
+            t1.classList.remove('team-spotlight-active', 'team-spotlight-dimmed', 'team-eliminated');
+
+            if (isRiskMode && riskLives[0] <= 0) t0.classList.add('team-eliminated');
+            if (isRiskMode && riskLives[1] <= 0) t1.classList.add('team-eliminated');
+
+            if (activeTeam === 0) {
+                if(!t0.classList.contains('team-eliminated')) t0.classList.add('team-spotlight-active');
+                t1.classList.add('team-spotlight-dimmed');
+            } else if (activeTeam === 1) {
+                if(!t1.classList.contains('team-eliminated')) t1.classList.add('team-spotlight-active');
+                t0.classList.add('team-spotlight-dimmed');
+            } 
+        }
+
+        // Reveal Logic
+        function revealAnswer(index, basePoints) {
+            const inner = document.getElementById(`card-${index}`);
+            if (inner.classList.contains('flipped')) return;
+            
+            stopTimer();
+
+            if (isRiskMode) {
+                if(activeTeam === -1) { showInfoPopup("TAKIM SEÇİLMEDİ", "Lütfen önce butona basın veya sıra verin!"); return; }
+                if(riskLives[activeTeam] <= 0) { showInfoPopup("ELENDİ", "Bu takımın hakkı bitti!"); return; }
+                
+                inner.classList.add('flipped');
+                const backFace = inner.querySelector('.card-back');
+                let effectPoints = basePoints;
+                const badge = backFace.querySelector('.points-badge');
+                badge.style.display = 'flex';
+                
+                if (effectPoints === -8888) {
+                        backFace.classList.add('risk-back-special'); badge.innerText = "HEDİYE";
+                        playSuspenseSound(); showInfoPopup("TEBRİKLER!", "FİZİKİ HEDİYE KAZANDINIZ!");
+                } else if (effectPoints < 0) {
+                    backFace.classList.add('risk-back-bad'); badge.innerText = effectPoints;
+                    teamScores[activeTeam] += effectPoints; playWrongSound();
+                } else {
+                    backFace.classList.add('risk-back-good'); badge.innerText = "+" + effectPoints;
+                    teamScores[activeTeam] += effectPoints; playCorrectSound();
+                }
+                
+                updateScoreBoard();
+                const allFlipped = [...document.querySelectorAll('#board-grid .card-inner')].every(c => c.classList.contains('flipped'));
+                if(allFlipped) { 
+                    canRevealAll = true;
+                    activeTeam = -1;
+                    showInfoPopup("TUR BİTTİ", "Sonraki Tura Geçebilirsiniz");
+                    syncAdminState();
+                    return; 
+                }
+
+                setTimeout(() => {
+                    const otherTeam = (activeTeam === 0) ? 1 : 0;
+                    if (riskLives[otherTeam] > 0) { activeTeam = otherTeam; highlightActiveTeam(); showInfoPopup("SIRA DEĞİŞTİ", `Sıra ${teamNames[otherTeam]}'da!`); }
+                    else { showInfoPopup("DEVAM", "Rakip elendi, sıra sizde!"); }
+                    buzzerLocked = false; syncAdminState();
+                }, 2000);
+                return;
+            }
+
+            inner.classList.add('flipped');
+            playCorrectSound();
+            const points = basePoints; 
+            const oldPoints = roundPoints;
+            roundPoints += points;
+            animateValue('round-points', oldPoints, roundPoints, 500);
+
+            if (isFaceOffPhase) {
+                let maxPoints = Math.max(...currentQuestions[currentRound-1].answers.map(a => a.points));
+                if (faceOffStep === 1) {
+                    faceOffScores[0] = points;
+                    if (points === maxPoints || faceOffMissOccurred) {
+                        activeTeam = firstBuzzTeam; highlightActiveTeam(); isFaceOffPhase = false; 
+                        showInfoPopup("KONTROL SAĞLANDI", `Kontrol ${teamNames[activeTeam]} Takımında!`);
+                    } else {
+                        const otherTeam = (firstBuzzTeam === 0) ? 1 : 0;
+                        activeTeam = otherTeam; highlightActiveTeam(); faceOffStep = 2; 
+                        showInfoPopup("SIRA DEĞİŞTİ", "Daha yüksek puan var mı? Sıra Diğer Takımda!");
+                    }
+                } else if (faceOffStep === 2) {
+                    faceOffScores[1] = points;
+                    let winnerTeam = (faceOffScores[0] > faceOffScores[1]) ? firstBuzzTeam : ((faceOffScores[1] > faceOffScores[0]) ? (firstBuzzTeam === 0 ? 1 : 0) : firstBuzzTeam);
+                    activeTeam = winnerTeam; highlightActiveTeam(); isFaceOffPhase = false; 
+                    showInfoPopup("KONTROL SAĞLANDI", `Kontrol ${teamNames[winnerTeam]} Takımında!`);
+                }
+            } else if (isStealMode) {
+                setTimeout(() => { 
+                    addPointsToTeam(activeTeam, roundPoints); 
+                    showInfoPopup("PUAN ÇALINDI!", `${teamNames[activeTeam]} Puanı Çaldı!`); 
+                    canRevealAll = true;
+                    activeTeam = -1;
+                    syncAdminState();
+                }, 1000);
+            }
+            
+            const allFlipped = [...document.querySelectorAll('#board-grid .card-inner')].every(c => c.classList.contains('flipped'));
+            if(allFlipped && !isStealMode) { 
+                setTimeout(() => { 
+                    if(activeTeam !== -1) addPointsToTeam(activeTeam, roundPoints); 
+                    canRevealAll = true;
+                    activeTeam = -1;
+                    showInfoPopup("TÜMÜ BULUNDU", "Sonraki Tura Geçebilirsiniz");
+                    syncAdminState(); 
+                }, 1500); 
+            }
+            
+            syncAdminState();
+        }
+        
+        function addPointsToTeam(teamIndex, pts) {
+            if (pts === 0) return;
+            const oldScore = teamScores[teamIndex];
+            teamScores[teamIndex] += pts;
+            animateValue(`score-${teamIndex}`, oldScore, teamScores[teamIndex], 1000);
+            updateRoundUI();
+            syncAdminState(); 
+        }
+
+        function showOverlayX(symbol = 'X') {
+            const overlay = document.getElementById('strike-overlay');
+            const textEl = overlay.querySelector('.big-x');
+            if(textEl) { textEl.innerText = symbol; textEl.style.animation = 'none'; textEl.offsetHeight; textEl.style.animation = null; }
+            overlay.classList.remove('overlay-flash'); void overlay.offsetWidth; overlay.classList.add('overlay-flash');
+            overlay.style.display = 'flex'; setTimeout(() => overlay.style.display = 'none', 1200);
+        }
+
+        function showStrikeVisual() {
+            strikeCount++;
+            const container = document.getElementById('strike-display');
+            const xMark = document.createElement('div');
+            xMark.className = 'text-red-600 h-16 w-16 flex items-center justify-center font-bold bg-black/60 rounded border-2 border-red-600 text-5xl animate-bounce';
+            xMark.innerText = 'X';
+            container.appendChild(xMark);
+            showOverlayX('X'); 
+            if (strikeCount === 3 && !isRiskMode && !isWordleMode) setTimeout(activateStealMode, 1200);
+            syncAdminState();
+        }
+
+        function triggerStrike() {
+            stopTimer();
+            playWrongSound();
+            if(isRiskMode) {
+                if(activeTeam === -1) return;
+                riskLives[activeTeam]--; addPointsToTeam(activeTeam, -50); updateRoundUI();
+                showInfoPopup("YANLIŞ!", "-1 CAN & -50 PUAN"); showOverlayX('💔');
+                if(riskLives[activeTeam] <= 0) {
+                    showInfoPopup("ELENDİ!", `${teamNames[activeTeam]} Kilitlendi!`);
+                    if(riskLives[0] <= 0 && riskLives[1] <= 0) { 
+                        setTimeout(() => { 
+                            showInfoPopup("TUR BİTTİ", "V tuşu ile cevapları açabilirsiniz."); 
+                            canRevealAll = true;
+                            activeTeam = -1;
+                            syncAdminState();
+                        }, 2000); 
+                        return; 
+                    }
+                }
+                const otherTeam = (activeTeam === 0) ? 1 : 0;
+                if(riskLives[otherTeam] > 0) { setTimeout(() => { activeTeam = otherTeam; highlightActiveTeam(); showInfoPopup("SIRA DEĞİŞTİ", `Sıra ${teamNames[otherTeam]}'da!`); syncAdminState(); }, 1500); }
+                syncAdminState(); return;
+            }
+
+            if (isFaceOffPhase) {
+                showOverlayX('X');
+                handleFaceOffStrike();
+                syncAdminState();
+                return;
+            }
+
+            if (isStealMode) {
+                showOverlayX('X');
+                const defendingTeam = activeTeam === 0 ? 1 : 0; 
+                addPointsToTeam(defendingTeam, roundPoints); 
+                showInfoPopup("PUAN KAÇTI!", `Puanlar ${teamNames[defendingTeam]}'a gitti!`); 
+                canRevealAll = true;
+                activeTeam = -1;
+                syncAdminState();
+                return;
+            }
+            
+            showStrikeVisual(); 
+        }
+
+        function triggerSilentStrike() {
+            stopTimer();
+            playWrongSound(); showOverlayX('X');
+            if (!isChainMode && !isRiskMode && !isWordleMode) {
+                if (isFaceOffPhase) {
+                    handleFaceOffStrike();
+                } else if (isStealMode) {
+                    const defendingTeam = activeTeam === 0 ? 1 : 0;
+                    addPointsToTeam(defendingTeam, roundPoints);
+                    showInfoPopup("PUAN KAÇTI!", `Puanlar ${teamNames[defendingTeam]}'a gitti!`);
+                    canRevealAll = true;
+                    activeTeam = -1;
+                } else if (activeTeam !== -1) {
+                    const otherTeam = (activeTeam === 0) ? 1 : 0;
+                    activeTeam = otherTeam; 
+                    highlightActiveTeam();
+                    showInfoPopup("SIRA DEĞİŞTİ", `Cevap Hakkı ${teamNames[activeTeam]} Takımına Geçti!`);
+                }
+            }
+            syncAdminState();
+        }
+
+        function activateStealMode() {
+            isStealMode = true; buzzerLocked = false; 
+            const stealingTeam = activeTeam === 0 ? 1 : 0; activeTeam = stealingTeam; highlightActiveTeam();
+            document.getElementById('steal-overlay').style.display = 'block'; document.getElementById(`steal-btn-${stealingTeam}`).classList.remove('hidden');
+            playStealSound(); syncAdminState();
+        }
+
+        function finishRound() { stopTimer(); prepareNextRound(); }
+
+        function updateRoundUI() {
+            document.getElementById('round-points').innerText = roundPoints;
+            const h0 = document.getElementById('hearts-0'); const h1 = document.getElementById('hearts-1');
+            if(isRiskMode) {
+                h0.style.display = 'flex'; h1.style.display = 'flex'; h0.innerHTML = ''; h1.innerHTML = '';
+                for(let i=0; i<2; i++) { const icon = document.createElement('i'); icon.className = 'fas fa-heart ' + (i < riskLives[0] ? 'heart-icon' : 'heart-lost'); h0.appendChild(icon); }
+                for(let i=0; i<2; i++) { const icon = document.createElement('i'); icon.className = 'fas fa-heart ' + (i < riskLives[1] ? 'heart-icon' : 'heart-lost'); h1.appendChild(icon); }
+            } else { h0.style.display = 'none'; h1.style.display = 'none'; }
+        }
+
+        function updateScoreBoard() { document.getElementById('score-0').innerText = teamScores[0]; document.getElementById('score-1').innerText = teamScores[1]; }
+
+        function endGame() {
+            stopTimer();
+            showScreen('screen-gameover');
+            let wName = "BERABERE", wScore = teamScores[0];
+            if (teamScores[0] > teamScores[1]) { wName = teamNames[0]; wScore = teamScores[0]; }
+            else if (teamScores[1] > teamScores[0]) { wName = teamNames[1]; wScore = teamScores[1]; }
+            document.getElementById('winner-name').innerText = wName;
+            document.getElementById('winner-score').innerText = wScore + " PUAN";
+            fireConfetti(); syncAdminState();
+        }
+
+        // --- ADMIN & DATA MANAGEMENT ---
+        function toggleAdmin() { 
+            const modal = document.getElementById('admin-modal');
+            modal.classList.toggle('hidden'); 
+            if(!modal.classList.contains('hidden')) renderAdminData(); 
+        }
+
+        function renderAdminData() {
+            document.getElementById('admin-body').innerHTML = `
+                <p class="text-sm text-gray-500 mb-4">Şu anki düzenleme modu kısıtlıdır. En iyi yönetim için "İndir" butonuyla JSON dosyasını alıp, düzenleyip tekrar "Yükle" yapınız.</p>
+                <div id="questions-container" class="space-y-6">
+                    <div class="mb-4"><h4 class="font-bold mb-2">Mevcut Veri İstatistikleri:</h4><ul class="list-disc pl-5"><li>Toplam Bölüm: ${appData.sets.length}</li><li>Toplam Takım: ${appData.teams.length}</li><li>Modlar: Normal, Risk, Wordle, Zincir</li></ul></div>
+                </div>
+            `;
+        }
+
+        function renderAdminShortcuts() {
+             const body = document.getElementById('admin-body');
+             body.innerHTML = `
+                <h4 class="font-bold text-xl mb-4 text-amber-600">Klavye Kısayolları</h4>
+                <div class="grid grid-cols-2 gap-4 text-sm text-gray-800">
+                    <div class="flex items-center gap-2"><span class="key-badge text-white">BOŞLUK</span> Buzzer Kilidini Aç / Hazır Ol</div>
+                    <div class="flex items-center gap-2"><span class="key-badge text-white">ENTER</span> Soruyu Göster / İçeriği Aç</div>
+                    <div class="flex items-center gap-2"><span class="key-badge text-white">1-6</span> Cevapları Aç (1,2,3...)</div>
+                    <div class="flex items-center gap-2"><span class="key-badge text-white">X</span> Hatalı Cevap (Sesli)</div>
+                    <div class="flex items-center gap-2"><span class="key-badge text-white">Z</span> Sıra Değiştir (Sessiz Hata)</div>
+                    <div class="flex items-center gap-2"><span class="key-badge text-white">C</span> Turu Bitir / Sonraki Tur</div>
+                    <div class="flex items-center gap-2"><span class="key-badge text-white">V</span> Tümünü Aç (Tur Sonu)</div>
+                    <div class="flex items-center gap-2"><span class="key-badge text-white">+</span> Müziği Aç/Kapa</div>
+                </div>
+                <div class="mt-6 text-xs text-gray-500">Not: Bu kısayollar sadece Host (Ana) ekranda çalışır. Veri yönetimi ekranına dönmek için sol üstteki başlığa tıklayın.</div>
+             `;
+        }
+
+        function resetDataToDefault() { if(confirm("Tüm veriler varsayılana dönecek. Emin misiniz?")) { localStorage.removeItem('tradeWarsData_v38'); location.reload(); } }
+        function exportData() { const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2)); const dlAnchorElem = document.createElement('a'); dlAnchorElem.setAttribute("href", dataStr); dlAnchorElem.setAttribute("download", "icu_ticaret_verileri.json"); dlAnchorElem.click(); }
+        
+        // --- FIXED IMPORT LOGIC ---
+        function importData(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    
+                    // CHECK 1: Dosyada 'sets' var mı?
+                    if(json.sets && Array.isArray(json.sets)) {
+                        // Sadece sets verisini güncelle
+                        appData.sets = json.sets;
+                        
+                        // CHECK 2: Dosyada 'teams' var mı? Varsa güncelle, yoksa eskisine dokunma.
+                        if(json.teams && Array.isArray(json.teams)) {
+                            appData.teams = json.teams;
+                        } else {
+                            // Eğer appData.teams boşsa varsayılanları koy
+                            if(!appData.teams || appData.teams.length === 0) {
+                                appData.teams = defaultTeams;
+                            }
+                        }
+
+                        localStorage.setItem('tradeWarsData_v38', JSON.stringify(appData));
+                        alert("Veriler Başarıyla Yüklendi! (Bölümler Güncellendi)");
+                        location.reload();
+                    } else {
+                        alert("Hata: JSON dosyasında 'sets' listesi bulunamadı.");
+                    }
+                } catch(err) {
+                    console.error(err);
+                    alert("Dosya okuma hatası! JSON formatını kontrol edin.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // --- AUDIO SYSTEM ---
+        function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        function toggleMusic() { initAudio(); if(audioCtx.state === 'suspended') audioCtx.resume(); isMusicOn = !isMusicOn; showInfoPopup("SES AYARI", isMusicOn ? "SES AÇILDI" : "SES KAPATILDI"); }
+        function playTone(freq, type, duration, vol=0.1) { if(!isMusicOn) return; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = type; osc.frequency.value = freq; gain.gain.setValueAtTime(vol, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + duration); }
+        function playCorrectSound() { if(!isMusicOn) return; playTone(523.25, 'sine', 0.6, 0.3); setTimeout(() => playTone(659.25, 'sine', 0.6, 0.3), 100); setTimeout(() => playTone(783.99, 'sine', 0.8, 0.3), 200); setTimeout(() => playTone(1046.50, 'sine', 1.0, 0.3), 300); }
+        function playWrongSound() { if(!isMusicOn) return; playTone(150, 'sawtooth', 0.5, 0.4); playTone(100, 'sawtooth', 0.5, 0.4); }
+        function playStealSound() { if(!isMusicOn) return; for(let i=0; i<3; i++) { setTimeout(() => playTone(800, 'square', 0.1, 0.2), i*200); setTimeout(() => playTone(600, 'square', 0.1, 0.2), i*200 + 100); } }
+        function playSuspenseSound() { if(!isMusicOn) return; playTone(100, 'sawtooth', 2.0, 0.1); }
+        function playBuzzerSound() { if(!isMusicOn) return; playTone(800, 'square', 0.3, 0.3); setTimeout(() => playTone(600, 'square', 0.5, 0.3), 50); }
+        function animateValue(id, start, end, duration) { const obj = document.getElementById(id); if(!obj) return; obj.classList.remove('score-bump'); void obj.offsetWidth; obj.classList.add('score-bump'); let current = start; const range = end - start; const increment = end > start ? 1 : -1; const step = Math.abs(Math.floor(duration / range)) || 10; const timer = setInterval(() => { current += increment; obj.innerText = current; if (current == end) clearInterval(timer); }, step); }
+        function fireConfetti() { var duration = 3000; var end = Date.now() + duration; (function frame() { confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 } }); confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 } }); if (Date.now() < end) requestAnimationFrame(frame); }()); }
+    </script>
+</body>
+</html>
